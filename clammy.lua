@@ -23,43 +23,43 @@
 addon.author   = 'MathMatic';
 addon.name     = 'Clammy';
 addon.desc     = 'Clamming calculator: displays bucket weight, items in bucket, & approximate value.';
-addon.version  = '0.2';
+addon.version  = '0.3';
 
 require ('common');
 local imgui = require('imgui');
 local settings = require('settings');
 
 local clammingItems = {
-	{ item="Bibiki slug",				weight=3,	gil=7},
+	{ item="Bibiki slug",				weight=3,	gil=11},
 	{ item="Bibiki urchin", 			weight=6,	gil=750},
 	{ item="Broken willow fishing rod",	weight=6,	gil=0},
-	{ item="Coral fragment",			weight=6,	gil=1735}, --AH=~3000
-	{ item="High-quality crab shell",	weight=6,	gil=3312}, --AH=~4500
+	{ item="Coral fragment",			weight=6,	gil=1735},
+	{ item="Quality crab shell",	    weight=6,	gil=3312}, --Note: For some reason using "High-quality" doesn't register properly, leave as "Quality" for the time being
 	{ item="Crab shell",				weight=6,	gil=392},  --Make sure HQ version is listed above NQ for proper registering of item
 	{ item="Elshimo coconut", 			weight=6,	gil=44},
-	{ item="Elm log", 					weight=6,	gil=4000}, --AH*, NPC=390
+	{ item="Elm log", 					weight=6,	gil=4000}, --Based on estimated AH value
 	{ item="Fish scales",				weight=3,	gil=23},
-	{ item="Goblin armor",				weight=6,	gil=200},  --AH*, NPC=0
-	{ item="Goblin mail", 				weight=6,	gil=1000}, --AH*, NPC=0
-	{ item="Goblin mask", 				weight=6,	gil=500},  --AH*, NPC=0
+	{ item="Goblin armor",				weight=6,	gil=70},   --Based on estimated AH value
+	{ item="Goblin mail", 				weight=6,	gil=1000}, --Based on estimated AH value
+	{ item="Goblin mask", 				weight=6,	gil=450},  --Based on estimated AH value
 	{ item="Hobgoblin bread", 			weight=6,	gil=91},
-	{ item="Hobgoblin pie", 			weight=6,	gil=153},
+	{ item="Hobgoblin pie", 			weight=6,	gil=165},
 	{ item="Igneous rock", 				weight=35,	gil=178},
 	{ item="Jacknife", 					weight=11,	gil=35},
-	{ item="Lacquer tree log", 			weight=6,	gil=6000}, --AH*, NPC=3578
+	{ item="Lacquer tree log", 			weight=6,	gil=6000}, --Based on estimated AH value
 	{ item="Maple log", 				weight=6,	gil=15},
 	{ item="Nebimonite", 				weight=6,	gil=53},
 	{ item="Oxblood", 					weight=6,	gil=13250},
 	{ item="Pamamas", 					weight=6,	gil=20},
 	{ item="Pamtam kelp", 				weight=6,	gil=7},
 	{ item="Pebble", 					weight=7,	gil=1},
-	{ item="Petrified log", 			weight=6,	gil=2193}, --AH=~3500
-	{ item="Quality pugil scales",		weight=6,	gil=253},  --AH~=1000 --Note: For some reason using "High-quality" doesn't register properly for pugil scales, leave as "Quality" (unsure why)
+	{ item="Petrified log", 			weight=6,	gil=2193}, 
+	{ item="Quality pugil scales",		weight=6,	gil=253},  --Note: For some reason using "High-quality" doesn't register properly, leave as "Quality" for the time being
 	{ item="Pugil scales", 				weight=3,	gil=23},   --Make sure HQ version is listed above NQ for proper registering of item
 	{ item="Rock salt",					weight=6,	gil=3},
 	{ item="Seashell", 					weight=6,	gil=29},
 	{ item="Shall shell",				weight=6,	gil=307},
-	{ item="Titanictus shell", 			weight=6,	gil=357},  --AH=~600
+	{ item="Titanictus shell", 			weight=6,	gil=357},
 	{ item="Tropical clam", 			weight=20,	gil=5100},
 	{ item="Turtle shell", 				weight=6,	gil=1190},
 	{ item="Uragnite shell", 			weight=6,	gil=1455},
@@ -67,22 +67,36 @@ local clammingItems = {
 	{ item="White sand",				weight=7,	gil=250},
 };
 
+local weightColor = {
+	{diff=200, color={1.0, 1.0, 1.0, 1.0}},
+	{diff=35, color={1.0, 1.0, 0.8, 1.0}},
+	{diff=20, color={1.0, 1.0, 0.4, 1.0}},
+	{diff=11, color={1.0, 1.0, 0.0, 1.0}},
+	{diff=7, color={1.0, 0.6, 0.0, 1.0}},
+	{diff=6, color={1.0, 0.4, 0.0, 1.0}},
+	{diff=3, color={1.0, 0.3, 0.0, 1.0}},
+}
+local bucketColor = {1.0,1.0,1.0,1.0};
+
 local defaultConfig = T{
+	showItems = true,
+	showValue = true,
 	log = false,
+	tone = false,
 }
 local config = settings.load(defaultConfig);
-
 
 local bucketSize = 50;
 local weight = 0;
 local money  = 0;
 local bucket = {};
 local cooldown = 0;
---local file = nil;
 
 local fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
 local fileDir = ('%s\\addons\\Clammy\\logs\\'):fmt(AshitaCore:GetInstallPath());
 local filePath = fileDir .. fileName;
+
+local playTone = false;
 
 --------------------------------------------------------------------
 local function emptyBucket()
@@ -94,6 +108,15 @@ local function emptyBucket()
 		bucket[idx] = 0;
 	end
 end
+
+--------------------------------------------------------------------
+function playSound()
+	if (config.tone == true) and (playTone == true) then
+		ashita.misc.play_sound(addon.path:append("clam.wav"));
+		playTone = false;
+	end
+end
+
 
 --------------------------------------------------------------------
 function openLogFile()
@@ -149,7 +172,6 @@ ashita.events.register('command', 'command_cb', function (e)
     -- Block all related commands..
     e.blocked = true;
 
-	--[[ --DEBUG COMMANDS
 	if (#args == 2 and args[2]:any('reset')) then --manually empty the bucket
 		emptyBucket();
         return;
@@ -160,18 +182,52 @@ ashita.events.register('command', 'command_cb', function (e)
         return;
     end
 
+	--[[ For debug purposes
 	if (#args == 3 and args[2]:any('additem')) then --manually add item
 		print("adding item: " .. args[3]);
         writeLogFile(args[3]);
         return;
     end
-	]]
+	--]]
+
+	if (#args == 3 and args[2]:any('showvalue')) then --turns loggin on/off
+        if (args[3] == "true") then
+			config.showValue = true;
+		else
+			config.showValue = false;
+		end
+
+		settings.save();
+        return;
+    end
+
+	if (#args == 3 and args[2]:any('showitems')) then --turns loggin on/off
+        if (args[3] == "true") then
+			config.showItems = true;
+		else
+			config.showItems = false;
+		end
+
+		settings.save();
+        return;
+    end
 
 	if (#args == 3 and args[2]:any('log')) then --turns loggin on/off
         if (args[3] == "true") then
 			config.log = true;
 		else
 			config.log = false;
+		end
+
+		settings.save();
+        return;
+    end
+
+	if (#args == 3 and args[2]:any('tone')) then --turns ready tone on/off
+        if (args[3] == "true") then
+			config.tone = true;
+		else
+			config.tone = false;
 		end
 
 		settings.save();
@@ -204,11 +260,18 @@ ashita.events.register('text_in', 'Clammy_HandleText', function (e)
 	if (string.match(e.message, "You find a")) then
 		for idx,citem in ipairs(clammingItems) do
 			if (string.match(string.lower(e.message), string.lower(citem.item)) ~= nil) then
-				--print("Item: " .. citem.item);
 				weight = weight + citem.weight;
 				money = money + citem.gil;
 				bucket[idx] = bucket[idx] + 1;
 				cooldown =  os.clock() + 10.5;
+
+				for _, item in ipairs(weightColor) do
+					if ((bucketSize - weight) < item.diff) then
+						bucketColor = item.color;
+					end
+				end
+
+				playTone = true;
 
 				if (config.log == true) then
 					writeLogFile(citem.item);
@@ -217,7 +280,6 @@ ashita.events.register('text_in', 'Clammy_HandleText', function (e)
 				return;
 			end
 		end
-		print(e.message);
 	end
 end);
 
@@ -238,31 +300,42 @@ ashita.events.register('d3d_present', 'present_cb', function ()
     imgui.SetNextWindowSize({ windowSize, -1, }, ImGuiCond_Always);
 	if (imgui.Begin('Clammy', true, bit.bor(ImGuiWindowFlags_NoDecoration))) then
 
-		imgui.Text("Bucket Weight: " .. weight .. " / " .. bucketSize);
+
+		imgui.Text("Bucket Weight [" .. bucketSize .. "]:");
+		imgui.SameLine();
+		imgui.SetWindowFontScale(1.3);
+		imgui.SetCursorPosY(imgui.GetCursorPosY()-2);
+		imgui.TextColored(bucketColor, tostring(weight));
+		imgui.SetWindowFontScale(1.0);
 		imgui.SameLine();
 		imgui.SetCursorPosX(imgui.GetCursorPosX() + imgui.GetColumnWidth() - imgui.GetStyle().FramePadding.x - imgui.CalcTextSize("[999]"));
 		local cdTime = math.floor(cooldown - os.clock());
 		if (cdTime < 0) then
-			cdTime = 0;
+			imgui.TextColored({ 0.5, 1.0, 0.5, 1.0 }, "  [*]");
+			playSound()
+		else
+			imgui.TextColored({ 1.0, 1.0, 0.5, 1.0 }, "  [" .. cdTime .. "]");
 		end
-		imgui.Text("  [" .. cdTime .. "]");
-		
-		imgui.Text("Total Gil [npc]: " .. money);
 
-		imgui.Separator();
+		if (config.showValue == true) then
+			imgui.Text("Estimated Value: " .. money);
+		end
 
-		for idx,citem in ipairs(clammingItems) do
-			if (bucket[idx] ~= 0) then
-				imgui.Text(" - " .. clammingItems[idx].item .. " [" .. bucket[idx] .. "]");
-				imgui.SameLine();
-				local valTxt = "(" .. clammingItems[idx].gil * bucket[idx] .. ")"
-				local x, _  = imgui.CalcTextSize(valTxt);
-				imgui.SetCursorPosX(imgui.GetCursorPosX() + imgui.GetColumnWidth() - x - imgui.GetStyle().FramePadding.x);
-				imgui.Text(valTxt);
+		if (config.showItems == true) then
+			imgui.Separator();
 
+			for idx,citem in ipairs(clammingItems) do
+				if (bucket[idx] ~= 0) then
+					imgui.Text(" - " .. clammingItems[idx].item .. " [" .. bucket[idx] .. "]");
+					imgui.SameLine();
+					local valTxt = "(" .. clammingItems[idx].gil * bucket[idx] .. ")"
+					local x, _  = imgui.CalcTextSize(valTxt);
+					imgui.SetCursorPosX(imgui.GetCursorPosX() + imgui.GetColumnWidth() - x - imgui.GetStyle().FramePadding.x);
+					imgui.Text(valTxt);
+
+				end
 			end
 		end
-
     end
     imgui.End();
 end);
