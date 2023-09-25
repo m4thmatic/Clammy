@@ -23,7 +23,7 @@
 addon.author   = 'MathMatic';
 addon.name     = 'Clammy';
 addon.desc     = 'Clamming calculator: displays bucket weight, items in bucket, & approximate value.';
-addon.version  = '0.3';
+addon.version  = '0.4';
 
 require ('common');
 local imgui = require('imgui');
@@ -243,17 +243,20 @@ ashita.events.register('text_in', 'Clammy_HandleText', function (e)
 
 	if (string.match(e.message, "You return the")) then
 		emptyBucket();
+		bucketColor = {1.0, 1.0, 1.0, 1.0};
 		return;
 	end
 
 	--Your clamming capacity has increased to XXX ponzes!
 	if (string.match(e.message, "Your clamming capacity has increased to")) then
 		bucketSize = bucketSize + 50;
+		bucketColor = {1.0, 1.0, 1.0, 1.0};
 		return;
 	end
 
 	if (string.match(e.message, "All your shellfish are washed back into the sea")) then
 		emptyBucket();
+		bucketColor = {1.0, 1.0, 1.0, 1.0};
 		return;
 	end
 
@@ -310,7 +313,7 @@ ashita.events.register('d3d_present', 'present_cb', function ()
 		imgui.SameLine();
 		imgui.SetCursorPosX(imgui.GetCursorPosX() + imgui.GetColumnWidth() - imgui.GetStyle().FramePadding.x - imgui.CalcTextSize("[999]"));
 		local cdTime = math.floor(cooldown - os.clock());
-		if (cdTime < 0) then
+		if (cdTime <= 0) then
 			imgui.TextColored({ 0.5, 1.0, 0.5, 1.0 }, "  [*]");
 			playSound()
 		else
