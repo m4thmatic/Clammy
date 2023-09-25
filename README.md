@@ -1,5 +1,8 @@
 # Clammy
-FFXI addon for AshitaXI v4 that displays clamming information.
+FFXI addon for AshitaXI v4 that displays basic clamming information. Bucket size & weight, countdown timer, and contents.
+
+![Clammy Image 1](images/image1.png "Clammy")
+![Clammy Image 2](images/image2.png "Clammy")
 
 ## Commands:
 ### Options
