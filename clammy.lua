@@ -17,10 +17,16 @@
 *
 * You should have received a copy of the GNU General Public License
 * along with Ashita.  If not, see <https://www.gnu.org/licenses/>.
-
 --]]
 
-addon.author   = 'MathMatic';
+--[[
+* Bleuhazen: Added some very minor tweaks -- especially the purple one saves me a lot!
+* - Bucket weight turns purple when you hand it in, because i always forgot to get a fresh one.
+* - Bucket weight turns black when you break it, just to make it clear.
+* - Changed [*] to GO!, and dim it a little when you start the dig.
+--]]
+
+addon.author   = 'MathMatic, with tweaks by Bleuhazen';
 addon.name     = 'Clammy';
 addon.desc     = 'Clamming calculator: displays bucket weight, items in bucket, & approximate value.';
 addon.version  = '0.4';
@@ -243,6 +249,12 @@ ashita.events.register('text_in', 'Clammy_HandleText', function (e)
 
 	if (string.match(e.message, "You return the")) then
 		emptyBucket();
+		-- bucketColor = {1.0, 1.0, 1.0, 1.0};
+		bucketColor = {0.7, 0.0, 0.7, 1.0};
+		return;
+	end
+
+	if (string.match(e.message, "Spoken like a true clammer!")) then
 		bucketColor = {1.0, 1.0, 1.0, 1.0};
 		return;
 	end
@@ -256,8 +268,13 @@ ashita.events.register('text_in', 'Clammy_HandleText', function (e)
 
 	if (string.match(e.message, "All your shellfish are washed back into the sea")) then
 		emptyBucket();
-		bucketColor = {1.0, 1.0, 1.0, 1.0};
+		-- bucketColor = {1.0, 1.0, 1.0, 1.0};
+		bucketColor = {0.0, 0.0, 0.0, 1.0};
 		return;
+	end
+
+	if (string.match(e.message, "The area is littered with pieces of broken seashells")) then
+		cooldown = 0;
 	end
 
 	if (string.match(e.message, "You find a")) then
@@ -312,12 +329,17 @@ ashita.events.register('d3d_present', 'present_cb', function ()
 		imgui.SetWindowFontScale(1.0);
 		imgui.SameLine();
 		imgui.SetCursorPosX(imgui.GetCursorPosX() + imgui.GetColumnWidth() - imgui.GetStyle().FramePadding.x - imgui.CalcTextSize("[999]"));
-		local cdTime = math.floor(cooldown - os.clock());
-		if (cdTime <= 0) then
-			imgui.TextColored({ 0.5, 1.0, 0.5, 1.0 }, "  [*]");
-			playSound()
+
+		if (cooldown == 0) then
+			imgui.TextColored({ 0.5, 0.65, 0.5, 1.0 }, "  GO!");
 		else
-			imgui.TextColored({ 1.0, 1.0, 0.5, 1.0 }, "  [" .. cdTime .. "]");
+			local cdTime = math.floor(cooldown - os.clock());
+			if (cdTime <= 0) then
+				imgui.TextColored({ 0.5, 1.0, 0.5, 1.0 }, "  GO!");
+				playSound()
+			else
+				imgui.TextColored({ 1.0, 1.0, 0.5, 1.0 }, "  [" .. cdTime .. "]");
+			end
 		end
 
 		if (config.showValue == true) then
