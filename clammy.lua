@@ -81,6 +81,8 @@ local bucketColor = {1.0,1.0,1.0,1.0};
 local defaultConfig = T{
 	showItems = true,
 	showValue = true,
+	showSessionInfo = true,
+	logAllResults = true,
 	log = false,
 	tone = false,
 }
@@ -91,6 +93,11 @@ local weight = 0;
 local money  = 0;
 local bucket = {};
 local cooldown = 0;
+local sessionValue = 0;
+local bucketsPurchased = 0;
+local startingTime = os.clock();
+local gilPerHour = 0;
+local trueSessionValue = 0;
 
 local fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
 local fileDir = ('%s\\addons\\Clammy\\logs\\'):fmt(AshitaCore:GetInstallPath());
@@ -99,14 +106,22 @@ local filePath = fileDir .. fileName;
 local playTone = false;
 
 --------------------------------------------------------------------
-local function emptyBucket()
+local function emptyBucket(turnedIn)
 	bucketSize = 50;
 	weight = 0;
 	money = 0;
 
 	for idx,citem in ipairs(clammingItems) do
+		if (config.log == true) and (turnedIn == true) and (config.logAllResults == false) then
+			for i = 1, bucket[idx] do
+				sessionValue = sessionValue + citem.gil;
+				writeLogFile(citem);
+			end
+		end
 		bucket[idx] = 0;
 	end
+	trueSessionValue = sessionValue - (bucketsPurchased * 500);
+	updateGilPerHour();
 end
 
 --------------------------------------------------------------------
@@ -117,6 +132,13 @@ function playSound()
 	end
 end
 
+--------------------------------------------------------------------
+function updateGilPerHour()
+	local now = os.clock();
+	if ((now - startingTime) > 0) then
+		gilPerHour = math.floor(trueSessionValue / ((now - startingTime) / 3600));
+	end
+end
 
 --------------------------------------------------------------------
 function openLogFile()
@@ -143,7 +165,7 @@ function writeLogFile(item)
 	local file = openLogFile();
 
 	if (file ~= nil) then
-		fdata = ('%s, %s\n'):fmt(os.date('%Y-%m-%d %H:%M:%S'), item);
+		fdata = ('%s, %s %s\n'):fmt(os.date('%Y-%m-%d %H:%M:%S'), item.item, item.gil);
 		file:write(fdata);
 	end
 
@@ -177,6 +199,16 @@ ashita.events.register('command', 'command_cb', function (e)
         return;
     end
 
+	if (#args == 2 and args[2]:any('resetsession')) then
+		startingTime = os.clock();
+		fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
+		filePath = fileDir .. fileName;
+		emptyBucket(false);
+		bucketsPurchased = 0;
+		gilPerHour = 0;
+		sessionValue = 0;
+	end
+
     if (#args == 3 and args[2]:any('weight')) then --manually overide the bucket's weight
         weight = tonumber(args[3]);
         return;
@@ -200,6 +232,28 @@ ashita.events.register('command', 'command_cb', function (e)
 		settings.save();
         return;
     end
+
+	if(args[2]:any('logbrokenbucketitems')) then
+		if (args[3] == "true") or config.logAllResults == false then
+			config.logAllResults = true;
+		else
+			config.logAllResults = false;
+		end
+
+		settings.save();
+        return;
+	end
+
+	if(args[2]:any('showsessioninfo')) then
+		if (args[3] == "true") or config.showSessionInfo == false then
+			config.showSessionInfo = true;
+		else
+			config.showSessionInfo = false;
+		end
+
+		settings.save();
+        return;
+	end
 
 	if (#args == 3 and args[2]:any('showitems')) then --turns loggin on/off
         if (args[3] == "true") then
@@ -242,9 +296,14 @@ ashita.events.register('text_in', 'Clammy_HandleText', function (e)
     end
 
 	if (string.match(e.message, "You return the")) then
-		emptyBucket();
+		emptyBucket(true);
 		bucketColor = {1.0, 1.0, 1.0, 1.0};
 		return;
+	end
+
+	if (string.match(e.message, "Obtained key item:")) then
+		local bucketWasPurchased = 1;
+		bucketsPurchased = bucketsPurchased + bucketWasPurchased;
 	end
 
 	--Your clamming capacity has increased to XXX ponzes!
@@ -255,7 +314,7 @@ ashita.events.register('text_in', 'Clammy_HandleText', function (e)
 	end
 
 	if (string.match(e.message, "All your shellfish are washed back into the sea")) then
-		emptyBucket();
+		emptyBucket(false);
 		bucketColor = {1.0, 1.0, 1.0, 1.0};
 		return;
 	end
@@ -276,8 +335,8 @@ ashita.events.register('text_in', 'Clammy_HandleText', function (e)
 
 				playTone = true;
 
-				if (config.log == true) then
-					writeLogFile(citem.item);
+				if (config.log == true) and (config.logAllResults == true) then
+					writeLogFile(citem);
 				end
 
 				return;
@@ -313,6 +372,7 @@ ashita.events.register('d3d_present', 'present_cb', function ()
 		imgui.SameLine();
 		imgui.SetCursorPosX(imgui.GetCursorPosX() + imgui.GetColumnWidth() - imgui.GetStyle().FramePadding.x - imgui.CalcTextSize("[999]"));
 		local cdTime = math.floor(cooldown - os.clock());
+		trueSessionValue = sessionValue - (bucketsPurchased * 500);
 		if (cdTime <= 0) then
 			imgui.TextColored({ 0.5, 1.0, 0.5, 1.0 }, "  [*]");
 			playSound()
@@ -324,6 +384,13 @@ ashita.events.register('d3d_present', 'present_cb', function ()
 			imgui.Text("Estimated Value: " .. money);
 		end
 
+		if (config.showSessionInfo == true) then
+			imgui.Separator();
+			imgui.Text("Total clamming value: " .. trueSessionValue);
+			imgui.Text("Gil earned per hour: " .. gilPerHour);
+			imgui.Text("Buckets purchased: " .. bucketsPurchased);
+		end
+		
 		if (config.showItems == true) then
 			imgui.Separator();
 
