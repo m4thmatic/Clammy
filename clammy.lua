@@ -20,7 +20,7 @@
 
 --]]
 
-addon.author   = 'MathMatic/DrifterX(Drakeson)';
+addon.author   = 'MathMatic/DrifterX';
 addon.name     = 'Clammy';
 addon.desc     = 'Clamming calculator: displays bucket weight, items in bucket, & approximate value.';
 addon.version  = '1.0';
@@ -29,8 +29,8 @@ require('common');
 local const = require('constants');
 local func = require('functions')
 Imgui = require('imgui');
-Settings = require('settings');
-Chat = require('chat');
+local settings = require('settings');
+
 
 local defaultConfig = T{
 	showItems = T{ true, },
@@ -48,7 +48,7 @@ local defaultConfig = T{
 	items = const.clammingItems,
 	splitItemsBySellType = T{ true, },
 }
-Config = Settings.load(defaultConfig);
+Config = settings.load(defaultConfig);
 
 local clammy = T{
 	lowValue = Config.lowValue[1],
@@ -79,7 +79,7 @@ local clammy = T{
 		moonPercent = 0,
 	},
 	bucketColor = {1.0,1.0,1.0,1.0},
-	items = T{const.clammingItems},
+	items = Config.items,
 	hideInDifferentZone = Config.hideInDifferentZone,
 	fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S')),
 	fileNameBroken = ('log_broken_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S')),
@@ -201,16 +201,15 @@ ashita.events.register('d3d_present', 'present_cb', function ()
 			Imgui.Text("Current moon phase is: " .. clammy.moonTable.moonPhase);
 			Imgui.Text("Current moon phase percentage is: " .. clammy.moonTable.moonPercent .. "%");
 		end
-		
 
 		if (Config.showItems[1] == true) then
 			Imgui.Separator();
 
-			for idx,citem in ipairs(const.clammingItems) do
+			for idx,citem in ipairs(clammy.items) do
 				if (clammy.bucket[idx] ~= 0) then
-					Imgui.Text(" - " .. const.clammingItems[idx].item .. " [" .. clammy.bucket[idx] .. "]");
+					Imgui.Text(" - " .. clammy.items[idx].item .. " [" .. clammy.bucket[idx] .. "]");
 					Imgui.SameLine();
-					local valTxt = "(" .. func.formatInt(const.clammingItems[idx].gil[1] * clammy.bucket[idx]) .. ")"
+					local valTxt = "(" .. func.formatInt(clammy.items[idx].gil[1] * clammy.bucket[idx]) .. ")"
 					local x, _  = Imgui.CalcTextSize(valTxt);
 					Imgui.SetCursorPosX(Imgui.GetCursorPosX() + Imgui.GetColumnWidth() - x - Imgui.GetStyle().FramePadding.x);
 					Imgui.Text(valTxt);

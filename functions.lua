@@ -11,10 +11,9 @@ func.emptyBucket = function(clammy, turnedIn, isReset)
 	clammy.money = 0;
 	clammy.hasBucket = false
 
-	for idx,citem in ipairs(const.clammingItems) do
+	for idx,citem in ipairs(clammy.items) do
 		clammy.bucket[idx] = 0;
 	end
-	-- print(chat.header(addon.name):append(chat.message(('Bucket turnin: %s'):format(turnedIn))));
 	if (isReset == false) then
         if (Config.log[1] == true) and (Config.logAllResults[1] == false) then
             local file = func.openLogFile(clammy, turnedIn);
@@ -54,8 +53,8 @@ func.writeBucket = function(clammy, item)
 		datetime = os.date('%Y-%m-%d %H:%M:%S'),
 		item = item.item,
 		gil = item.gil[1],
-		vendor = item.vendor,
-		moonPercent = clammy.moonTable.moonPhasePercent[1],
+		vendor = item.vendor[1],
+		moonPercent = clammy.moonTable.moonPercent,
 		bucketsPurchased = clammy.bucketsPurchased,
 	}
 	table.insert(clammy.trackingBucket, fdata);
@@ -118,7 +117,7 @@ func.renderEditor = function(clammy)
     if (not clammy.editorIsOpen[1]) then
         return clammy;
     end
-    Imgui.SetNextWindowSize({ 600, 800, });
+    Imgui.SetNextWindowSize({ 600, 450, });
     Imgui.SetNextWindowSizeConstraints({ 600, 450, }, { FLT_MAX, FLT_MAX, });
     if (Imgui.Begin('Clammy##Config', clammy.editorIsOpen)) then
 
@@ -168,7 +167,7 @@ end
 
 func.renderGeneralConfig = function()
     Imgui.Text('General Settings');
-    Imgui.BeginChild('settings_general', { 0, 285, }, true);
+    Imgui.BeginChild('settings_general', { 0, 320, }, true);
         Imgui.Checkbox('Items in Bucket', Config.showItems);
         Imgui.ShowHelp('Toggles whether items in current bucket should be shown.');
         Imgui.Checkbox('Show Session Info', Config.showSessionInfo);
@@ -198,7 +197,7 @@ end
 
 func.renderItemListConfig = function()
     Imgui.Text('Item Settings');
-    Imgui.BeginChild("settings_general", {0, 650, }, true);
+    Imgui.BeginChild("settings_general", {0, 320, }, true);
         Imgui.InputInt(Config.items[1].item, Config.items[1].gil);
         Imgui.InputInt(Config.items[2].item, Config.items[2].gil);
         Imgui.InputInt(Config.items[3].item, Config.items[3].gil);
@@ -535,13 +534,14 @@ func.handleTextIn = function(e, clammy)
 	if (string.match(e.message, "All your shellfish are washed back into the sea")) then
 		clammy = func.emptyBucket(clammy, false, false);
 		clammy.bucketIsBroke = true;
+		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
 		return clammy;
 	end
 
 	if (string.match(e.message, "You find a")) then
-		for idx,citem in ipairs(const.clammingItems) do
+		for idx,citem in ipairs(clammy.items) do
 			if (string.match(string.lower(e.message), string.lower(citem.item)) ~= nil) then
-				clammy = clammy.writeBucket(clammy, citem);
+				clammy = func.writeBucket(clammy, citem);
 				clammy.weight = clammy.weight + citem.weight;
 				clammy.money = clammy.money + citem.gil[1];
 				clammy.bucket[idx] = clammy.bucket[idx] + 1;
