@@ -20,7 +20,7 @@
 
 --]]
 
-addon.author   = 'MathMatic/DorifitoX(Drakeson)';
+addon.author   = 'MathMatic/DrifterX(Drakeson)';
 addon.name     = 'Clammy';
 addon.desc     = 'Clamming calculator: displays bucket weight, items in bucket, & approximate value.';
 addon.version  = '1.0';
