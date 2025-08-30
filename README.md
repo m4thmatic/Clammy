@@ -1,16 +1,23 @@
 # Clammy
 FFXI addon for AshitaXI v4 that displays basic clamming information. Bucket size & weight, countdown timer, and contents.
 
-![Clammy Image 1](images/image1.png "Clammy")
-![Clammy Image 2](images/image2.png "Clammy")
+![](https://private-user-images.githubusercontent.com/14827266/477145202-cf079c1e-1ed7-47c5-b3bf-307ad2a942fc.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NTUwNTgwNDYsIm5iZiI6MTc1NTA1Nzc0NiwicGF0aCI6Ii8xNDgyNzI2Ni80NzcxNDUyMDItY2YwNzljMWUtMWVkNy00N2M1LWIzYmYtMzA3YWQyYTk0MmZjLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTA4MTMlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUwODEzVDA0MDIyNlomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTA1ODRmNjgyNzAzZTk5NjcyMzU1ZTExNjg3N2I5YmExNzgxOGUxYjkyYjYyYWJjMGUzMDYxOTEzZDQ3ZGNmNDImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.zlYHRhLy0d69aNxsSpn4DLL8pnoP3C2vL4sUIb7reSQ)
+![](https://private-user-images.githubusercontent.com/14827266/477146077-449c8652-1620-4ac2-bf5d-8f082539cf52.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NTUwNTgwNDYsIm5iZiI6MTc1NTA1Nzc0NiwicGF0aCI6Ii8xNDgyNzI2Ni80NzcxNDYwNzctNDQ5Yzg2NTItMTYyMC00YWMyLWJmNWQtOGYwODI1MzljZjUyLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTA4MTMlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUwODEzVDA0MDIyNlomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTU2NzU2ODcyMmMzODliMzE2ZmYzNWQwOWRkZDYxNjVlZTVmYTU3OTlmNTNhMmNkYjY0NzA2ZDUwMjVlMjcxMDEmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.blumH3aHF3t8jAEtvigfHVpe_owIVf2eIpMiRgq9MV4)
+![](https://private-user-images.githubusercontent.com/14827266/477146808-c3a1859a-4b5c-473f-b1b0-e1e35cd71168.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NTUwNTgwNDYsIm5iZiI6MTc1NTA1Nzc0NiwicGF0aCI6Ii8xNDgyNzI2Ni80NzcxNDY4MDgtYzNhMTg1OWEtNGI1Yy00NzNmLWIxYjAtZTFlMzVjZDcxMTY4LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTA4MTMlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUwODEzVDA0MDIyNlomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTYxNmFlZmQzNTU3ODdmMGYyYzFmMjkzMDM0NDFhYTVjNDU5Y2Y2NTE0YzUxNjdlYjg3ODQxYWE5YWJlYzY2YjQmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.8M7aLUizGblcevz4lbcjXFODLWyQVI-B55XIe0OyeO4)
 
 ## Commands:
 ### Options
- `/clammy showvalue [true/false]` *Turn display of estimated value on/off*  
- `/clammy showitems [true/false]` *Turn display of individual items on/off*  
- `/clammy log true` *Turns on results logging - stores file in /addons/Clammy/logs*  
- `/clammy log false` *Turns off results logging (default)*  
- `/clammy tone [true/false]` *Turns on/off playing a tone when clamming point is ready to dig*  
+ `/clammy` *Opens a config menu for general configs*
+ `/clammy showvalue [true/false/...]` *Turn display of estimated value on/off*  
+ `/clammy showitems [true/false/...]` *Turn display of individual items on/off*  
+ `/clammy log [true/false/...]` *Turns on/off results logging - stores file in /addons/Clammy/logs*
+ `/clammy tone [true/false/...]` *Turns on/off playing a tone when clamming point is ready to dig*  
+ `/clammy logbrokenbucketitems [true/false/...]` *Turns on/off logging if the bucket breaks*
+ `/clammy showsessioninfo [true/false/...]` *Turns on/off showing gil/hr, buckets purchased, and total gil earned*
+ `/clammy usebucketvalueforweightcolor [true/false/...]` *turns on/off current weight value turning red at certain gil amounts*
+ `/clammy setweightvalues [highvalue/midvalue/lowvalue] #####` *Specify a value for when bucket color should turn red*
+ `/clammy resetsession` *Resets the current clamming time, buckets purchased, items in bucket, gil/hr, and total gil earned*
+
 ### Debug
  `/clammy reset` *Manually clear bucket information*
  `/clammy weight` *Manually adjust bucket weight*
