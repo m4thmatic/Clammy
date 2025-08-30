@@ -118,7 +118,7 @@ func.renderEditor = function(clammy)
     if (not clammy.editorIsOpen[1]) then
         return clammy;
     end
-    Imgui.SetNextWindowSize({ 600, 800, });
+    Imgui.SetNextWindowSize({ 600, 450, });
     Imgui.SetNextWindowSizeConstraints({ 600, 450, }, { FLT_MAX, FLT_MAX, });
     if (Imgui.Begin('Clammy##Config', clammy.editorIsOpen)) then
 
@@ -168,7 +168,7 @@ end
 
 func.renderGeneralConfig = function()
     Imgui.Text('General Settings');
-    Imgui.BeginChild('settings_general', { 0, 285, }, true);
+    Imgui.BeginChild('settings_general', { 0, 320, }, true);
         Imgui.Checkbox('Items in Bucket', Config.showItems);
         Imgui.ShowHelp('Toggles whether items in current bucket should be shown.');
         Imgui.Checkbox('Show Session Info', Config.showSessionInfo);
@@ -198,7 +198,7 @@ end
 
 func.renderItemListConfig = function()
     Imgui.Text('Item Settings');
-    Imgui.BeginChild("settings_general", {0, 650, }, true);
+    Imgui.BeginChild("settings_general", {0, 320, }, true);
         Imgui.InputInt(Config.items[1].item, Config.items[1].gil);
         Imgui.InputInt(Config.items[2].item, Config.items[2].gil);
         Imgui.InputInt(Config.items[3].item, Config.items[3].gil);
