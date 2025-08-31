@@ -174,41 +174,41 @@ local constants = T{
     };
 
     clammingItems = {
-        { item="Bibiki slug",				weight=3,	gil=T{10}, 	vendor = true},
-        { item="Bibiki urchin", 			weight=6,	gil=T{750}, 	vendor = true},
-        { item="Broken willow fishing rod",	weight=6,	gil=T{0}, 		vendor = false},
-        { item="Coral fragment",			weight=6,	gil=T{1750}, 	vendor = true},
-        { item="Quality crab shell",	    weight=6,	gil=T{3312}, 	vendor = true}, --Note: For some reason using "High-quality" doesn't register properly, leave as "Quality" for the time being
-        { item="Crab shell",				weight=6,	gil=T{371}, 	vendor = true},  --Make sure HQ version is listed above NQ for proper registering of item
-        { item="Elshimo coconut", 			weight=6,	gil=T{44}, 	vendor = true},
-        { item="Elm log", 					weight=6,	gil=T{4000}, 	vendor = false}, --Based on estimated AH value
-        { item="Fish scales",				weight=3,	gil=T{24}, 	vendor = true},
-        { item="Goblin armor",				weight=6,	gil=T{0}, 		vendor = false},   --Based on estimated AH value
-        { item="Goblin mail", 				weight=6,	gil=T{1000}, 	vendor = false}, --Based on estimated AH value
-        { item="Goblin mask", 				weight=6,	gil=T{0}, 		vendor = false},  --Based on estimated AH value
-        { item="Hobgoblin bread", 			weight=6,	gil=T{91}, 	vendor = true},
-        { item="Hobgoblin pie", 			weight=6,	gil=T{150}, 	vendor = true},
-        { item="Igneous rock", 				weight=35,	gil=T{178}, 	vendor = true},
-        { item="Jacknife", 					weight=11,	gil=T{53}, 	vendor = true},
-        { item="Lacquer tree log", 			weight=6,	gil=T{6000}, 	vendor = false}, --Based on estimated AH value
-        { item="Maple log", 				weight=6,	gil=T{15}, 	vendor = true},
-        { item="Nebimonite", 				weight=6,	gil=T{53}, 	vendor = true},
-        { item="Oxblood", 					weight=6,	gil=T{13250}, 	vendor = true},
-        { item="Pamamas", 					weight=6,	gil=T{20}, 	vendor = true},
-        { item="Pamtam kelp", 				weight=6,	gil=T{8}, 		vendor = true},
-        { item="Pebble", 					weight=7,	gil=T{1}, 		vendor = true},
-        { item="Petrified log", 			weight=6,	gil=T{2193}, 	vendor = true}, 
-        { item="Quality pugil scales",		weight=6,	gil=T{260}, 	vendor = true},  --Note: For some reason using "High-quality" doesn't register properly, leave as "Quality" for the time being
-        { item="Pugil scales", 				weight=3,	gil=T{23}, 	vendor = true},   --Make sure HQ version is listed above NQ for proper registering of item
-        { item="Rock salt",					weight=6,	gil=T{3}, 		vendor = true},
-        { item="Seashell", 					weight=6,	gil=T{30}, 	vendor = true},
-        { item="Shall shell",				weight=6,	gil=T{300}, 	vendor = true},
-        { item="Titanictus shell", 			weight=6,	gil=T{350}, 	vendor = true},
-        { item="Tropical clam", 			weight=20,	gil=T{5100}, 	vendor = true},
-        { item="Turtle shell", 				weight=6,	gil=T{1224}, 	vendor = true},
-        { item="Uragnite shell", 			weight=6,	gil=T{1455}, 	vendor = true},
-        { item="Vongola clam", 				weight=6,	gil=T{192}, 	vendor = true},
-        { item="White sand",				weight=7,	gil=T{250}, 	vendor = true},
+        { item="Bibiki slug",				weight=3,	gil=T{10}, 	vendor = {true}},
+        { item="Bibiki urchin", 			weight=6,	gil=T{750}, 	vendor = {true}},
+        { item="Broken willow fishing rod",	weight=6,	gil=T{0}, 		vendor = {false}},
+        { item="Coral fragment",			weight=6,	gil=T{1750}, 	vendor = {true}},
+        { item="Quality crab shell",	    weight=6,	gil=T{3312}, 	vendor = {true}}, --Note: For some reason using "High-quality" doesn't register properly, leave as "Quality" for the time being
+        { item="Crab shell",				weight=6,	gil=T{371}, 	vendor = {true}},  --Make sure HQ version is listed above NQ for proper registering of item
+        { item="Elshimo coconut", 			weight=6,	gil=T{44}, 	vendor = {true}},
+        { item="Elm log", 					weight=6,	gil=T{4000}, 	vendor = {false}}, --Based on estimated AH value
+        { item="Fish scales",				weight=3,	gil=T{24}, 	vendor = {true}},
+        { item="Goblin armor",				weight=6,	gil=T{0}, 		vendor = {false}},   --Based on estimated AH value
+        { item="Goblin mail", 				weight=6,	gil=T{1000}, 	vendor = {false}}, --Based on estimated AH value
+        { item="Goblin mask", 				weight=6,	gil=T{0}, 		vendor = {false}},  --Based on estimated AH value
+        { item="Hobgoblin bread", 			weight=6,	gil=T{91}, 	vendor = {true}},
+        { item="Hobgoblin pie", 			weight=6,	gil=T{150}, 	vendor = {true}},
+        { item="Igneous rock", 				weight=35,	gil=T{178}, 	vendor = {true}},
+        { item="Jacknife", 					weight=11,	gil=T{53}, 	vendor = {true}},
+        { item="Lacquer tree log", 			weight=6,	gil=T{6000}, 	vendor = {false}}, --Based on estimated AH value
+        { item="Maple log", 				weight=6,	gil=T{15}, 	vendor = {true}},
+        { item="Nebimonite", 				weight=6,	gil=T{53}, 	vendor = {true}},
+        { item="Oxblood", 					weight=6,	gil=T{13250}, 	vendor = {true}},
+        { item="Pamamas", 					weight=6,	gil=T{20}, 	vendor = {true}},
+        { item="Pamtam kelp", 				weight=6,	gil=T{8}, 		vendor = {true}},
+        { item="Pebble", 					weight=7,	gil=T{1}, 		vendor = {true}},
+        { item="Petrified log", 			weight=6,	gil=T{2193}, 	vendor = {true}}, 
+        { item="Quality pugil scales",		weight=6,	gil=T{260}, 	vendor = {true}},  --Note: For some reason using "High-quality" doesn't register properly, leave as "Quality" for the time being
+        { item="Pugil scales", 				weight=3,	gil=T{23}, 	vendor = {true}},   --Make sure HQ version is listed above NQ for proper registering of item
+        { item="Rock salt",					weight=6,	gil=T{3}, 		vendor = {true}},
+        { item="Seashell", 					weight=6,	gil=T{30}, 	vendor = {true}},
+        { item="Shall shell",				weight=6,	gil=T{300}, 	vendor = {true}},
+        { item="Titanictus shell", 			weight=6,	gil=T{350}, 	vendor = {true}},
+        { item="Tropical clam", 			weight=20,	gil=T{5100}, 	vendor = {true}},
+        { item="Turtle shell", 				weight=6,	gil=T{1224}, 	vendor = {true}},
+        { item="Uragnite shell", 			weight=6,	gil=T{1455}, 	vendor = {true}},
+        { item="Vongola clam", 				weight=6,	gil=T{192}, 	vendor = {true}},
+        { item="White sand",				weight=7,	gil=T{250}, 	vendor = {true}},
     };
 }
 

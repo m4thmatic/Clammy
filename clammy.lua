@@ -29,7 +29,7 @@ require('common');
 local const = require('constants');
 local func = require('functions')
 Imgui = require('imgui');
-local settings = require('settings');
+Settings = require('settings');
 
 
 local defaultConfig = T{
@@ -48,7 +48,7 @@ local defaultConfig = T{
 	items = const.clammingItems,
 	splitItemsBySellType = T{ true, },
 }
-Config = settings.load(defaultConfig);
+Config = Settings.load(defaultConfig);
 
 local clammy = T{
 	lowValue = Config.lowValue[1],
@@ -85,6 +85,7 @@ local clammy = T{
 	fileNameBroken = ('log_broken_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S')),
 	fileDir = ('%s\\addons\\Clammy\\logs\\'):fmt(AshitaCore:GetInstallPath()),
 	playTone = false,
+	showItemSeparator = false;
 }
 clammy.filePath = clammy.fileDir .. clammy.fileName;
 clammy.filePathBroken = clammy.fileDir .. clammy.fileNameBroken;
@@ -203,10 +204,12 @@ ashita.events.register('d3d_present', 'present_cb', function ()
 		end
 
 		if (Config.showItems[1] == true) then
-			Imgui.Separator();
-
+			if clammy.showItemSeparator == true then
+				Imgui.Separator();
+			end
 			for idx,citem in ipairs(clammy.items) do
 				if (clammy.bucket[idx] ~= 0) then
+					clammy.showItemSeparator = true;
 					Imgui.Text(" - " .. clammy.items[idx].item .. " [" .. clammy.bucket[idx] .. "]");
 					Imgui.SameLine();
 					local valTxt = "(" .. func.formatInt(clammy.items[idx].gil[1] * clammy.bucket[idx]) .. ")"

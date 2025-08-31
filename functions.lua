@@ -1,6 +1,5 @@
 local const = require("Constants");
 require('common');
-local settings = require('settings');
 local chat = require('chat');
 
 local func = T{};
@@ -10,6 +9,7 @@ func.emptyBucket = function(clammy, turnedIn, isReset)
 	clammy.weight = 0;
 	clammy.money = 0;
 	clammy.hasBucket = false
+	clammy.showItemSeparator = false;
 
 	for idx,citem in ipairs(clammy.items) do
 		clammy.bucket[idx] = 0;
@@ -117,33 +117,23 @@ func.renderEditor = function(clammy)
     if (not clammy.editorIsOpen[1]) then
         return clammy;
     end
-    Imgui.SetNextWindowSize({ 600, 450, });
-    Imgui.SetNextWindowSizeConstraints({ 600, 450, }, { FLT_MAX, FLT_MAX, });
+    Imgui.SetNextWindowSize({ 500, 450, });
+    Imgui.SetNextWindowSizeConstraints({ 0, 0, }, { FLT_MAX, FLT_MAX, });
     if (Imgui.Begin('Clammy##Config', clammy.editorIsOpen)) then
 
-        -- imgui.SameLine();
         if (Imgui.Button('Save Settings')) then
-            settings.save();
+            Settings.save();
             print(chat.header(addon.name):append(chat.message('Settings saved.')));
         end
         Imgui.SameLine();
-        if (Imgui.Button('Reload Settings')) then
-            settings.reload();
-            print(chat.header(addon.name):append(chat.message('Settings reloaded.')));
-        end
-        Imgui.SameLine();
         if (Imgui.Button('Reset Settings')) then
-            settings.reset();
+            Settings.reset();
             print(chat.header(addon.name):append(chat.message('Settings reset to defaults.')));
         end
         Imgui.SameLine();
-        if (Imgui.Button('Clear Session')) then
+        if (Imgui.Button('Reset Session')) then
             clammy = func.resetSession(clammy);
             print(chat.header(addon.name):append(chat.message('Reset session.')));
-        end
-        Imgui.SameLine();
-        if (Imgui.Button('Reload Clammy')) then
-            print('/addon reload clammy');
         end
 
         Imgui.Separator();
@@ -186,53 +176,166 @@ func.renderGeneralConfig = function()
         Imgui.ShowHelp('Toggles if the weight in the window should be based on value of the bucket.');
         Imgui.Checkbox('No clammy outside the bay', Config.hideInDifferentZone);
         Imgui.ShowHelp('Toggles if the clammy window should hide if not in Bibiki Bay.')
+		Imgui.SetNextItemWidth(100);
 		Imgui.InputInt('High value amount', Config.highValue);
 		Imgui.ShowHelp('Indicates when bucket weight turns red at less than 20 ponze of space remaining.');
+		Imgui.SetNextItemWidth(100);
 		Imgui.InputInt('Medium value amount', Config.midValue);
 		Imgui.ShowHelp('Indicates when bucket weight turns red at less than 11 ponze of space remaining.');
+		Imgui.SetNextItemWidth(100);
 		Imgui.InputInt('Low value amount', Config.lowValue);
 		Imgui.ShowHelp('Indicates when bucket weight turns red at less than 7 ponze of space remaining.');
     Imgui.EndChild();
 end
 
 func.renderItemListConfig = function()
-    Imgui.Text('Item Settings');
-    Imgui.BeginChild("settings_general", {0, 320, }, true);
-        Imgui.InputInt(Config.items[1].item, Config.items[1].gil);
-        Imgui.InputInt(Config.items[2].item, Config.items[2].gil);
-        Imgui.InputInt(Config.items[3].item, Config.items[3].gil);
-        Imgui.InputInt(Config.items[4].item, Config.items[4].gil);
-        Imgui.InputInt(Config.items[5].item, Config.items[5].gil);
-        Imgui.InputInt(Config.items[6].item, Config.items[6].gil);
-        Imgui.InputInt(Config.items[7].item, Config.items[7].gil);
-        Imgui.InputInt(Config.items[8].item, Config.items[8].gil);
-        Imgui.InputInt(Config.items[9].item, Config.items[9].gil);
-        Imgui.InputInt(Config.items[10].item, Config.items[10].gil);
-        Imgui.InputInt(Config.items[11].item, Config.items[11].gil);
-        Imgui.InputInt(Config.items[12].item, Config.items[12].gil);
-        Imgui.InputInt(Config.items[13].item, Config.items[13].gil);
-        Imgui.InputInt(Config.items[14].item, Config.items[14].gil);
-        Imgui.InputInt(Config.items[15].item, Config.items[15].gil);
-        Imgui.InputInt(Config.items[16].item, Config.items[16].gil);
-        Imgui.InputInt(Config.items[17].item, Config.items[17].gil);
-        Imgui.InputInt(Config.items[18].item, Config.items[18].gil);
-        Imgui.InputInt(Config.items[19].item, Config.items[19].gil);
-        Imgui.InputInt(Config.items[20].item, Config.items[20].gil);
-        Imgui.InputInt(Config.items[21].item, Config.items[21].gil);
-        Imgui.InputInt(Config.items[22].item, Config.items[22].gil);
-        Imgui.InputInt(Config.items[23].item, Config.items[23].gil);
-        Imgui.InputInt(Config.items[24].item, Config.items[24].gil);
-        Imgui.InputInt(Config.items[25].item, Config.items[25].gil);
-        Imgui.InputInt(Config.items[26].item, Config.items[26].gil);
-        Imgui.InputInt(Config.items[27].item, Config.items[27].gil);
-        Imgui.InputInt(Config.items[28].item, Config.items[28].gil);
-        Imgui.InputInt(Config.items[29].item, Config.items[29].gil);
-        Imgui.InputInt(Config.items[30].item, Config.items[30].gil);
-        Imgui.InputInt(Config.items[31].item, Config.items[31].gil);
-        Imgui.InputInt(Config.items[32].item, Config.items[32].gil);
-        Imgui.InputInt(Config.items[33].item, Config.items[33].gil);
-        Imgui.InputInt(Config.items[34].item, Config.items[34].gil);
-        Imgui.InputInt(Config.items[35].item, Config.items[35].gil);
+    Imgui.BeginChild("settings_items", {0, 320, }, true);
+		Imgui.Text('    Item Value:');
+		Imgui.ShowHelp('Set sale price of item.');
+		Imgui.SameLine();
+		Imgui.Text('                Vendor:')
+		Imgui.ShowHelp('Check whether to sell to a vendor or the AH.');
+		Imgui.Separator();
+		Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[1].item .. '      ', Config.items[1].gil); -- Bibiki slug      -- 17
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[1].item, Config.items[1].vendor);
+		Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[2].item .. '    ', Config.items[2].gil); -- Bibiki urchin
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[2].item, Config.items[2].vendor);
+		Imgui.SetNextItemWidth(100);
+        Imgui.InputInt('Bkn. willow rod  ', Config.items[3].gil); -- Broken willow fishing rod
+		Imgui.SameLine();
+		Imgui.Checkbox('Bkn. willow rod', Config.items[3].vendor, 'Bkn. willow rod');
+		Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[4].item .. '   ', Config.items[4].gil); -- Coral fragment
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[4].item, Config.items[4].vendor, Config.items[4].item);
+		Imgui.SetNextItemWidth(100);
+        Imgui.InputInt('H.Q. crab shell  ', Config.items[5].gil); -- Quality crab shell
+        Imgui.SameLine();
+		Imgui.Checkbox(Config.items[5].item, Config.items[5].vendor, 'H.Q. crab shell');
+		Imgui.SetNextItemWidth(100);
+		Imgui.InputInt(Config.items[6].item .. '       ', Config.items[6].gil); -- Crab shell
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[6].item, Config.items[6].vendor, Config.items[6].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[7].item .. '  ', Config.items[7].gil); -- Elshimo coconut (Not in Horizon)
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[7].item, Config.items[7].vendor, Config.items[7].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[8].item .. '          ', Config.items[8].gil); -- Elm log
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[8].item, Config.items[8].vendor, Config.items[8].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[9].item .. '      ', Config.items[9].gil); -- Fish scales
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[9].item, Config.items[9].vendor, Config.items[9].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[10].item .. '     ', Config.items[10].gil); -- Goblin armor
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[10].item, Config.items[10].vendor, Config.items[10].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[11].item .. '      ', Config.items[11].gil); -- Goblin mail
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[11].item, Config.items[11].vendor, Config.items[11].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[12].item .. '      ', Config.items[12].gil); -- Goblin mask
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[12].item, Config.items[12].vendor, Config.items[12].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[13].item .. '  ', Config.items[13].gil); -- Hobgoblin bread
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[13].item, Config.items[13].vendor, Config.items[13].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[14].item .. '    ', Config.items[14].gil); -- Hobgoblin pie
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[14].item, Config.items[14].vendor, Config.items[14].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[15].item .. '     ', Config.items[15].gil); -- Igneous rock (Not on Horizon)
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[15].item, Config.items[15].vendor, Config.items[15].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[16].item .. '         ', Config.items[16].gil); -- Jacknife
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[16].item, Config.items[16].vendor, Config.items[16].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[17].item .. ' ', Config.items[17].gil); -- Lacquer tree log
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[17].item, Config.items[17].vendor, Config.items[17].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[18].item .. '        ', Config.items[18].gil); -- Maple log
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[18].item, Config.items[18].vendor, Config.items[18].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[19].item .. '       ', Config.items[19].gil); -- Nebimonite
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[19].item, Config.items[19].vendor, Config.items[19].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[20].item .. '          ', Config.items[20].gil); -- Oxblood
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[20].item, Config.items[20].vendor, Config.items[20].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[21].item .. '          ', Config.items[21].gil); -- Pamamas
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[21].item, Config.items[21].vendor, Config.items[21].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[22].item .. '      ', Config.items[22].gil); -- Pamtam kelp
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[22].item, Config.items[22].vendor, Config.items[22].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[23].item .. '           ', Config.items[23].gil); -- Pebble
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[23].item, Config.items[23].vendor, Config.items[23].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[24].item .. '    ', Config.items[24].gil); -- Petrified log
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[24].item, Config.items[24].vendor, Config.items[24].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt('H.Q. pugil Scls. ', Config.items[25].gil); -- Quality pugil scales
+		Imgui.SameLine();
+		Imgui.Checkbox('H.Q. pugil Scls.', Config.items[25].vendor, Config.items[25].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[26].item .. '     ', Config.items[26].gil); -- Pugil scales
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[26].item, Config.items[26].vendor, Config.items[26].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[27].item .. '        ', Config.items[27].gil); -- Rock salt (Not on Horizon)
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[27].item, Config.items[27].vendor, Config.items[27].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[28].item .. '         ', Config.items[28].gil); -- Seashell
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[28].item, Config.items[28].vendor, Config.items[28].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[29].item .. '      ', Config.items[29].gil); -- Shall shell
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[29].item, Config.items[29].vendor, Config.items[29].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[30].item .. ' ', Config.items[30].gil); -- Titanictus shell
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[30].item, Config.items[30].vendor, Config.items[30].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[31].item .. '    ', Config.items[31].gil); -- Tropical clam
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[31].item, Config.items[31].vendor, Config.items[31].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[32].item .. '     ', Config.items[32].gil); -- Turtle shell
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[32].item, Config.items[32].vendor, Config.items[32].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[33].item .. '   ', Config.items[33].gil); -- Uragnite shell
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[33].item, Config.items[33].vendor, Config.items[33].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[34].item .. '     ', Config.items[34].gil); -- Vongola clam
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[34].item, Config.items[34].vendor, Config.items[34].item);
+        Imgui.SetNextItemWidth(100);
+        Imgui.InputInt(Config.items[35].item .. '       ', Config.items[35].gil); -- White sand
+		Imgui.SameLine();
+		Imgui.Checkbox(Config.items[35].item, Config.items[35].vendor, Config.items[35].item);
     Imgui.EndChild();
 end
 
@@ -282,7 +385,7 @@ func.toggleShowValue = function(shouldShowValue)
 		Config.showValue[1] = false;
 		print(chat.header(addon.name):append(chat.message('Show value turned off.')));
 	end
-	settings.save();
+	Settings.save();
 end
 
 func.toggleLogAllResults = function(shouldLogAllResults)
@@ -296,7 +399,7 @@ func.toggleLogAllResults = function(shouldLogAllResults)
 		print(chat.header(addon.name):append(chat.message('Logging only items actually received.')));
 	end
 
-	settings.save();
+	Settings.save();
 end
 
 func.toggleShowSessionInfo = function(shouldShowSessionInfo)
@@ -308,7 +411,7 @@ func.toggleShowSessionInfo = function(shouldShowSessionInfo)
 		print(chat.header(addon.name):append(chat.message('Not showing gil earned and gil per hour.')));
 	end
 
-	settings.save();
+	Settings.save();
 end
 
 func.toggleUseBucketValueForWeightColor = function(shouldUseBucketValueForWeightColor)
@@ -323,7 +426,7 @@ func.toggleUseBucketValueForWeightColor = function(shouldUseBucketValueForWeight
 		print(chat.header(addon.name):append(chat.message('Bucket weight color based on odds of breaking bucket.')));
 	end
 
-	settings.save();
+	Settings.save();
 end
 
 func.setWeightValues = function(weightLevel, value)
@@ -347,7 +450,7 @@ func.setWeightValues = function(weightLevel, value)
 		print(chat.header(addon.name):append(chat.message('Invalid setweightvalues parameter passed.')));
 	end
 
-	settings.save();
+	Settings.save();
 end
 
 func.toggleShowItems = function(shouldShowItems)
@@ -361,7 +464,7 @@ func.toggleShowItems = function(shouldShowItems)
 		print(chat.header(addon.name):append(chat.message('Show items turned off.')));
 	end
 
-	settings.save();
+	Settings.save();
 end
 
 func.toggleLogItems = function(shouldLogItems)
@@ -373,7 +476,7 @@ func.toggleLogItems = function(shouldLogItems)
 		print(chat.header(addon.name):append(chat.message('Logging items turned off.')));
 	end
 
-	settings.save();
+	Settings.save();
 end
 
 func.togglePlayTone = function(shouldPlayTone)
@@ -385,7 +488,7 @@ func.togglePlayTone = function(shouldPlayTone)
 		print(chat.header(addon.name):append(chat.message('Play tone turned off.')));
 	end
 
-	settings.save();
+	Settings.save();
 end
 
 func.toggleTrackMoon = function(shouldShowMoon)
@@ -397,7 +500,7 @@ func.toggleTrackMoon = function(shouldShowMoon)
         print(chat.header(addon.name):append(chat.message('Display Moon turned off.')));
     end
 
-    settings.save();
+    Settings.save();
 end
 
 func.getTimestamp = function()
