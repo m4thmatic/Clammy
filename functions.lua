@@ -1124,7 +1124,7 @@ func.renderClammy = function(clammy)
 				imgui.Text(": " .. clammy.bucketsReceived); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets  Bought)(Gil):    " .. clammy.bucketsReceived));
 				imgui.TextColored(textColor, "(".. func.formatInt(clammy.bucketsPurchased) .. ")(" .. func.formatInt(bucketCost) .. ")");
 			else
-				imgui.Text("Buckets : "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets  (Gil spent):   "));
+				imgui.Text("Buckets : "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets  (Gil spent):    "));
 				imgui.Text("" .. clammy.bucketsPurchased);
 			end
 			local now = os.clock();
