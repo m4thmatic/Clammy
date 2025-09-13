@@ -626,6 +626,9 @@ end
 
 func.getCurrentEquip = function(clammy)
     local inv = AshitaCore:GetMemoryManager():GetInventory();
+	if (inv == nil) then
+		return clammy;
+	end
     local bodyEquip = inv:GetEquippedItem(5);
     local bodyIndex = bit.band(bodyEquip.Index, 0x00FF);
     local bodyContainer = bit.band(bodyEquip.Index, 0xFF00) / 256;
