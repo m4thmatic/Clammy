@@ -84,7 +84,7 @@ local constants = T{
         [82] = 93,
         [83] = 95,
         [84] = 98
-    };
+    },
 
     moonPhase = T{
         [1] = 'Full Moon',
@@ -171,45 +171,102 @@ local constants = T{
         [82] = 'Full Moon',
         [83] = 'Full Moon',
         [84] = 'Full Moon'
-    };
+    },
 
     clammingItems = {
-        { item="Bibiki slug",				weight=3,	gil=T{10}, 	vendor = {true}},
-        { item="Bibiki urchin", 			weight=6,	gil=T{750}, 	vendor = {true}},
-        { item="Broken willow fishing rod",	weight=6,	gil=T{0}, 		vendor = {false}},
-        { item="Coral fragment",			weight=6,	gil=T{1750}, 	vendor = {true}},
-        { item="Quality crab shell",	    weight=6,	gil=T{3312}, 	vendor = {true}}, --Note: For some reason using "High-quality" doesn't register properly, leave as "Quality" for the time being
-        { item="Crab shell",				weight=6,	gil=T{371}, 	vendor = {true}},  --Make sure HQ version is listed above NQ for proper registering of item
-        { item="Elshimo coconut", 			weight=6,	gil=T{44}, 	vendor = {true}},
-        { item="Elm log", 					weight=6,	gil=T{4000}, 	vendor = {false}}, --Based on estimated AH value
-        { item="Fish scales",				weight=3,	gil=T{24}, 	vendor = {true}},
-        { item="Goblin armor",				weight=6,	gil=T{0}, 		vendor = {false}},   --Based on estimated AH value
-        { item="Goblin mail", 				weight=6,	gil=T{1000}, 	vendor = {false}}, --Based on estimated AH value
-        { item="Goblin mask", 				weight=6,	gil=T{0}, 		vendor = {false}},  --Based on estimated AH value
-        { item="Hobgoblin bread", 			weight=6,	gil=T{91}, 	vendor = {true}},
-        { item="Hobgoblin pie", 			weight=6,	gil=T{150}, 	vendor = {true}},
-        { item="Igneous rock", 				weight=35,	gil=T{178}, 	vendor = {true}},
-        { item="Jacknife", 					weight=11,	gil=T{53}, 	vendor = {true}},
-        { item="Lacquer tree log", 			weight=6,	gil=T{6000}, 	vendor = {false}}, --Based on estimated AH value
-        { item="Maple log", 				weight=6,	gil=T{15}, 	vendor = {true}},
-        { item="Nebimonite", 				weight=6,	gil=T{53}, 	vendor = {true}},
-        { item="Oxblood", 					weight=6,	gil=T{13250}, 	vendor = {true}},
-        { item="Pamamas", 					weight=6,	gil=T{20}, 	vendor = {true}},
-        { item="Pamtam kelp", 				weight=6,	gil=T{8}, 		vendor = {true}},
-        { item="Pebble", 					weight=7,	gil=T{1}, 		vendor = {true}},
-        { item="Petrified log", 			weight=6,	gil=T{2193}, 	vendor = {true}}, 
-        { item="Quality pugil scales",		weight=6,	gil=T{260}, 	vendor = {true}},  --Note: For some reason using "High-quality" doesn't register properly, leave as "Quality" for the time being
-        { item="Pugil scales", 				weight=3,	gil=T{23}, 	vendor = {true}},   --Make sure HQ version is listed above NQ for proper registering of item
-        { item="Rock salt",					weight=6,	gil=T{3}, 		vendor = {true}},
-        { item="Seashell", 					weight=6,	gil=T{30}, 	vendor = {true}},
-        { item="Shall shell",				weight=6,	gil=T{300}, 	vendor = {true}},
-        { item="Titanictus shell", 			weight=6,	gil=T{350}, 	vendor = {true}},
-        { item="Tropical clam", 			weight=20,	gil=T{5100}, 	vendor = {true}},
-        { item="Turtle shell", 				weight=6,	gil=T{1224}, 	vendor = {true}},
-        { item="Uragnite shell", 			weight=6,	gil=T{1455}, 	vendor = {true}},
-        { item="Vongola clam", 				weight=6,	gil=T{192}, 	vendor = {true}},
-        { item="White sand",				weight=7,	gil=T{250}, 	vendor = {true}},
-    };
+        { item = "Bibiki slug",				    weight = 3,	    gil = T{10}, 	vendor = {true},    rarity = T{0.0952463341840045},  },
+        { item = "Bibiki urchin", 			    weight = 6,	    gil = T{750}, 	vendor = {true},    rarity = T{0.0108136165059042},  },
+        { item = "Broken willow fishing rod",	weight = 6,	    gil = T{0}, 	vendor = {false},   rarity = T{0.0201565811670055},   },
+        { item = "Coral fragment",			    weight = 6,	    gil = T{1750}, 	vendor = {true},    rarity = T{0.0119814870885419},  },
+        { item = "Quality crab shell",	        weight = 6,	    gil = T{3312}, 	vendor = {true},    rarity = T{0.0051040269907868}, }, --Note: For some reason using "High-quality" doesn't register properly, leave as "Quality" for the time being
+        { item = "Crab shell",				    weight = 6,	    gil = T{371}, 	vendor = {true},    rarity = T{0.0245252822353908},  },  --Make sure HQ version is listed above NQ for proper registering of item
+        { item = "Elshimo coconut",             weight = 6,     gil = T{44},    vendor = {true},    rarity = T{0.0000000000000000},  },
+        { item = "Elm log", 					weight = 6,	    gil = T{4000}, 	vendor = {false},   rarity = T{0.0056663350490938}, }, --Based on estimated AH value
+        { item = "Fish scales",				    weight = 3,	    gil = T{24}, 	vendor = {true},    rarity = T{0.0460227518491284},  },
+        { item = "Goblin armor",				weight = 6,	    gil = T{0}, 	vendor = {false},   rarity = T{0.0214542151477140},  },   --Based on estimated AH value
+        { item = "Goblin mail", 				weight = 6,	    gil = T{1000}, 	vendor = {false},   rarity = T{0.0234439205848004},  }, --Based on estimated AH value
+        { item = "Goblin mask", 				weight = 6,	    gil = T{0}, 	vendor = {false},   rarity = T{0.0221030321380683},  },  --Based on estimated AH value
+        { item = "Hobgoblin bread", 			weight = 6,	    gil = T{91}, 	vendor = {true},    rarity = T{0.0235736839828712},  },
+        { item = "Hobgoblin pie", 			    weight = 6,	    gil = T{150}, 	vendor = {true},    rarity = T{0.0241792465072019},  },
+        { item = "Igneous rock", 				weight = 35,	gil = T{178}, 	vendor = {true},    rarity = T{0.0000000000000000},  },
+        { item = "Jacknife", 					weight = 11,	gil = T{53}, 	vendor = {true},    rarity = T{0.0922617760283749},  },
+        { item = "Lacquer tree log", 			weight = 6,	    gil = T{6000}, 	vendor = {false},   rarity = T{0.0042389376703145}, }, --Based on estimated AH value
+        { item = "Maple log", 				    weight = 6,	    gil = T{15}, 	vendor = {true},    rarity = T{0.0147065184480298},  },
+        { item = "Nebimonite", 				    weight = 6,	    gil = T{53}, 	vendor = {true},    rarity = T{0.0247415545655089},  },
+        { item = "Oxblood", 					weight = 6,	    gil = T{13250}, vendor = {true},    rarity = T{0.0044552100004325}, },
+        { item = "Pamamas", 					weight = 6,	    gil = T{20}, 	vendor = {true},    rarity = T{0.0000000000000000},  },
+        { item = "Pamtam kelp", 				weight = 6,	    gil = T{8}, 	vendor = {true},    rarity = T{0.0621566676759375},  },
+        { item = "Pebble", 					    weight = 7,	    gil = T{1}, 	vendor = {true},    rarity = T{0.1969808382715520},   },
+        { item = "Petrified log", 			    weight = 6,	    gil = T{2193}, 	vendor = {true},    rarity = T{0.0049310091266923}, },
+        { item = "Quality pugil scales",		weight = 6,	    gil = T{260}, 	vendor = {true},    rarity = T{0.0145335005839353},  },  --Note: For some reason using "High-quality" doesn't register properly, leave as "Quality" for the time being
+        { item = "Pugil scales", 				weight = 3,	    gil = T{23}, 	vendor = {true},    rarity = T{0.0443358276742074},  },   --Make sure HQ version is listed above NQ for proper registering of item
+        { item = "Rock salt",					weight = 6,	    gil = T{3}, 	vendor = {true},    rarity = T{0.0000000000000000},  },
+        { item = "Seashell", 					weight = 6,	    gil = T{30}, 	vendor = {true},    rarity = T{0.0256931528180285},  },
+        { item = "Shall shell",				    weight = 6,	    gil = T{300}, 	vendor = {true},    rarity = T{0.0526839396167654},   },
+        { item = "Titanictus shell", 			weight = 6,	    gil = T{350}, 	vendor = {true},    rarity = T{0.0137549201955102},  },
+        { item = "Tropical clam", 			    weight = 20,	gil = T{5100}, 	vendor = {true},    rarity = T{0.0150525541762187},   },
+        { item = "Turtle shell", 				weight = 6,	    gil = T{1224}, 	vendor = {true},    rarity = T{0.0113326700981876},  },
+        { item = "Uragnite shell", 			    weight = 6,	    gil = T{1455}, 	vendor = {true},    rarity = T{0.0040659198062200}, },
+        { item = "Vongola clam", 				weight = 6,	    gil = T{192}, 	vendor = {true},    rarity = T{0.0563173147627493},  },
+        { item = "White sand",				    weight = 7,	    gil = T{250}, 	vendor = {true},    rarity = T{0.0234871750508240},  },
+    },
+
+    clammingRarityNoHQGear = T{ -- These are all based on wiki https://horizonffxi.wiki/Category:Clamming
+        { item = "Bibiki slug",				    weight = 3,     rarity = T{0.111},               },
+        { item = "Bibiki urchin", 			    weight = 6,     rarity = T{0.010},               },
+        { item = "Broken willow fishing rod",	weight = 6,     rarity = T{0.018},               },
+        { item = "Coral fragment",			    weight = 6,     rarity = T{0.007},               },
+        { item = "Quality crab shell",	        weight = 6,     rarity = T{0.003},               },
+        { item = "Crab shell",				    weight = 6,     rarity = T{0.023},               },
+        { item = "Elshimo coconut",             weight = 6,     rarity = T{0},                   },
+        { item = "Elm log", 					weight = 6,     rarity = T{0.002},               },
+        { item = "Fish scales",				    weight = 3,     rarity = T{0.037},               },
+        { item = "Goblin armor",				weight = 6,     rarity = T{0.019},               },
+        { item = "Goblin mail", 				weight = 6,     rarity = T{0.021},               },
+        { item = "Goblin mask", 				weight = 6,     rarity = T{0.022},               },
+        { item = "Hobgoblin bread", 			weight = 6,     rarity = T{0.023},               },
+        { item = "Hobgoblin pie", 			    weight = 6,     rarity = T{0.027},               },
+        { item = "Igneous rock", 				weight = 35,    rarity = T{0},                   },
+        { item = "Jacknife", 					weight = 11,    rarity = T{0.116},               },
+        { item = "Lacquer tree log", 			weight = 6,     rarity = T{0.002},               },
+        { item = "Maple log", 				    weight = 6,     rarity = T{0.013},               },
+        { item = "Nebimonite", 				    weight = 6,     rarity = T{0.023},               },
+        { item = "Oxblood", 					weight = 6,     rarity = T{0.003},               },
+        { item = "Pamamas", 					weight = 6,     rarity = T{0},                   },
+        { item = "Pamtam kelp", 				weight = 6,     rarity = T{0.062},               },
+        { item = "Pebble", 					    weight = 7,     rarity = T{0.223},               },
+        { item = "Petrified log", 			    weight = 6,     rarity = T{0.002},               },
+        { item = "Quality pugil scales",		weight = 6,     rarity = T{0.011},               },
+        { item = "Pugil scales", 				weight = 3,     rarity = T{0.035},               },
+        { item = "Rock salt",					weight = 6,     rarity = T{0},                   },
+        { item = "Seashell", 					weight = 6,     rarity = T{0.018},               },
+        { item = "Shall shell",				    weight = 6,     rarity = T{0.056},               },
+        { item = "Titanictus shell", 			weight = 6,     rarity = T{0.014},               },
+        { item = "Tropical clam", 			    weight = 20,    rarity = T{0.019},               },
+        { item = "Turtle shell", 				weight = 6,     rarity = T{0.009},               },
+        { item = "Uragnite shell", 			    weight = 6,     rarity = T{0.010},               },
+        { item = "Vongola clam", 				weight = 6,     rarity = T{0.049},               },
+        { item = "White sand",				    weight = 7,     rarity = T{0.020},               },
+    },
+
+    hqGearIndexes = T{
+        { name = 'HUME_GILET_P1',                   id = 14457 },
+        { name = 'HUME_TOP_P1',                     id = 14458 },
+        { name = 'ELVAAN_GILET_P1',                 id = 14459 },
+        { name = 'ELVAAN_TOP_P1',                   id = 14460 },
+        { name = 'TARUTARU_MAILLOT_P1',             id = 14461 },
+        { name = 'TARUTARU_TOP_P1',                 id = 14472 },
+        { name = 'MITHRA_TOP_P1',                   id = 14462 },
+        { name = 'GALKA_GILET_P1',                  id = 14463 },
+        { name = 'HUME_TRUNKS_P1',                  id = 15415 },
+        { name = 'HUME_SHORTS_P1',                  id = 15416 },
+        { name = 'ELVAAN_TRUNKS_P1',                id = 15417 },
+        { name = 'ELVAAN_SHORTS_P1',                id = 15418 },
+        { name = 'TARUTARU_TRUNKS_P1',              id = 15419 },
+        { name = 'TARUTARU_SHORTS_P1',              id = 15424 },
+        { name = 'MITHRA_SHORTS_P1',                id = 15420 },
+        { name = 'GALKA_TRUNKS_P1',                 id = 15421 },
+    },
 }
 
 return constants;

@@ -1,7 +1,7 @@
-local const = require("Constants");
+local const = require("constants");
 require('common');
 local chat = require('chat');
-
+local imgui = require('imgui');
 local func = T{};
 
 func.emptyBucket = function(clammy, turnedIn, isReset)
@@ -15,7 +15,7 @@ func.emptyBucket = function(clammy, turnedIn, isReset)
 		clammy.bucket[idx] = 0;
 	end
 	if (isReset == false) then
-        if (Config.log[1] == true) and (Config.logAllResults[1] == false) then
+        if (Config.log[1] == true) and (Config.legacyLog[1] == false) then
             local file = func.openLogFile(clammy, turnedIn);
             for _,row in ipairs(clammy.trackingBucket) do
                 if turnedIn == true then
@@ -41,10 +41,17 @@ func.emptyBucket = function(clammy, turnedIn, isReset)
     end
 
 	clammy.trackingBucket = {};
-	clammy.trueSessionValue = clammy.sessionValue - (clammy.bucketsPurchased * 500);
-	clammy.trueSessionValueNPC = clammy.sessionValueNPC - (clammy.bucketsPurchased * 500);
+	if Config.subtractBucketCostFromGilEarned[1] == true then
+		clammy.trueSessionValue = clammy.sessionValue - (clammy.bucketsPurchased * 500);
+	else
+		clammy.trueSessionValue = clammy.sessionValue;
+	end
+	clammy.trueSessionValueNPC = clammy.sessionValueNPC;
 	clammy.trueSessionValueAH = clammy.sessionValueAH;
 	clammy = func.updateGilPerHour(clammy);
+	if isReset == true then
+		clammy.bucketAverageTime = 0;
+	end
 	return clammy;
 end
 
@@ -56,14 +63,19 @@ func.writeBucket = function(clammy, item)
 		vendor = item.vendor[1],
 		moonPercent = clammy.moonTable.moonPercent,
 		bucketsPurchased = clammy.bucketsPurchased,
+		hasHQLegs = clammy.hasHQLegs,
 	}
 	table.insert(clammy.trackingBucket, fdata);
 	return clammy;
 end
 
 func.playSound = function(clammy)
+	local waveFile = 'clam.wav';
+	if (clammy.stopSound == true) then
+		waveFile = 'stop.wav';
+	end
 	if (Config.tone[1] == true) and (clammy.playTone == true) then
-		ashita.misc.play_sound(addon.path:append("clam.wav"));
+		ashita.misc.play_sound(addon.path:append(waveFile));
 		clammy.playTone = false;
 	end
     return clammy;
@@ -72,9 +84,196 @@ end
 func.updateGilPerHour = function(clammy)
 	local now = os.clock();
 	if ((now - clammy.startingTime) > 0) then
-		clammy.gilPerHour = math.floor(clammy.trueSessionValue / ((now - clammy.startingTime) / 3600));
+		clammy.gilPerHourMinusBucket = math.floor(clammy.trueSessionValue / ((now - clammy.startingTime) / 3600));
+		clammy.gilPerHour = math.floor(clammy.sessionValue / ((now - clammy.startingTime) / 3600));
 		clammy.gilPerHourNPC = math.floor(clammy.trueSessionValueNPC / ((now - clammy.startingTime) / 3600));
 		clammy.gilPerHourAH = math.floor(clammy.trueSessionValueAH / ((now - clammy.startingTime) / 3600));
+	end
+	return clammy;
+end
+
+func.calculateTimePerBucket = function(clammy)
+	local now = os.clock();
+	local thisBucketTime = now - clammy.bucketStartTime;
+	clammy.bucketTimeWith = clammy.bucketTimeWith + thisBucketTime;
+	if clammy.bucketAverageTime == 0 then
+		clammy.bucketAverageTime = thisBucketTime;
+	else
+		clammy.bucketAverageTime = (clammy.bucketTimeWith / clammy.bucketsReceived);
+	end
+	return clammy
+end
+
+func.calculateChanceOfBreak = function(clammy, remainingWeight)
+	local sixWeightPercent = 0;
+	local sevenWeightPercent = 0;
+	local elevenWeightPercent = 0;
+	local twentyWeightPercent = 0;
+	local tableToUse = Config.items;
+	if (clammy.hasHQLegs == false) then
+		tableToUse = const.clammingRarityNoHQGear;
+	end
+	for _, item in ipairs(tableToUse) do
+		if (item.weight == 20) then
+			twentyWeightPercent = twentyWeightPercent + item.rarity[1];
+		elseif (item.weight == 11) then
+			elevenWeightPercent = elevenWeightPercent + item.rarity[1];
+		elseif (item.weight == 7) then
+			sevenWeightPercent = sevenWeightPercent + item.rarity[1];
+		elseif (item.weight == 6) then
+			sixWeightPercent = sixWeightPercent + item.rarity[1];
+		end
+	end
+	local returnData = T{ };
+	if remainingWeight < 3 then
+	returnData = T {
+			color = {1.0, 0.0, 0.0, 1.0},
+			percentWeight = 100,
+		}
+	elseif remainingWeight < 6 then
+		returnData = T {
+			color = {1.0, 0.05, 0.0, 1.0},
+			percentWeight = (twentyWeightPercent + elevenWeightPercent + sevenWeightPercent + sixWeightPercent),
+		};
+	elseif remainingWeight < 7 then
+		returnData = T {
+			color = {1.0, 0.32, 0.0, 1.0},
+			percentWeight = (twentyWeightPercent + elevenWeightPercent + sevenWeightPercent),
+		};
+	elseif remainingWeight < 11 then
+		returnData = T {
+			color = {1.0, 0.98, 0.0, 1.0},
+			percentWeight = (twentyWeightPercent + elevenWeightPercent),
+		};
+	elseif remainingWeight < 20 then
+		returnData = T {
+			color = {0.0, 1.0, 0.098, 1.0},
+			percentWeight = twentyWeightPercent,
+		};
+	else
+		returnData = T {
+			color = {1.0, 1.0, 1.0, 1.0},
+			percentWeight = 0,
+		};
+	end
+	if (clammy.bucketSize == 200) then
+		local clammingIncidentModifier = 0.9;
+		if (clammy.hasHQBody == true) then
+			clammingIncidentModifier = 0.95;
+		end
+		if (returnData.percentWeight == 100) then
+			returnData.percentWeight = 100;
+		else
+			returnData.percentWeight = 1 - ((1 - returnData.percentWeight) * clammingIncidentModifier);
+		end
+	end
+	return returnData;
+end
+
+func.formatChanceBreak = function(percentWeight)
+	if (percentWeight == 0) or (percentWeight == 100) then
+		percentWeight = ("%0.0f"):fmt(percentWeight);
+	else
+		percentWeight = ("%.2f"):fmt(percentWeight * 100);
+	end
+	return percentWeight;
+end
+
+local function calcRarityDifference()
+	local rarityHQ = T{
+		threeWeightPercent = 0,
+		sixWeightPercent = 0,
+		sevenWeightPercent = 0,
+		elevenWeightPercent = 0,
+		twentyWeightPercent = 0,
+	};
+	local rarityNoHQ = T{
+		threeWeightPercent = 0,
+		sixWeightPercent = 0,
+		sevenWeightPercent = 0,
+		elevenWeightPercent = 0,
+		twentyWeightPercent = 0,
+	};
+
+	local tableToUse = Config.items;
+	for _, item in ipairs(tableToUse) do
+		if (item.weight == 20) then
+			rarityHQ.twentyWeightPercent = rarityHQ.twentyWeightPercent + item.rarity[1];
+		elseif (item.weight == 11) then
+			rarityHQ.elevenWeightPercent = rarityHQ.elevenWeightPercent + item.rarity[1];
+		elseif (item.weight == 7) then
+			rarityHQ.sevenWeightPercent = rarityHQ.sevenWeightPercent + item.rarity[1];
+		elseif (item.weight == 6) then
+			rarityHQ.sixWeightPercent = rarityHQ.sixWeightPercent + item.rarity[1];
+		elseif (item.weight == 3) then
+			rarityHQ.threeWeightPercent = rarityHQ.threeWeightPercent + item.rarity[1];
+		end
+	end
+
+	tableToUse = const.clammingRarityNoHQGear;
+	for _, item in ipairs(tableToUse) do
+		if (item.weight == 20) then
+			rarityNoHQ.twentyWeightPercent = rarityNoHQ.twentyWeightPercent + item.rarity[1];
+		elseif (item.weight == 11) then
+			rarityNoHQ.elevenWeightPercent = rarityNoHQ.elevenWeightPercent + item.rarity[1];
+		elseif (item.weight == 7) then
+			rarityNoHQ.sevenWeightPercent = rarityNoHQ.sevenWeightPercent + item.rarity[1];
+		elseif (item.weight == 6) then
+			rarityNoHQ.sixWeightPercent = rarityNoHQ.sixWeightPercent + item.rarity[1];
+		elseif (item.weight == 3) then
+			rarityNoHQ.threeWeightPercent = rarityNoHQ.threeWeightPercent + item.rarity[1];
+		end
+	end
+
+	local rarityDifference = T{
+		threeWeightPercent = rarityNoHQ.threeWeightPercent - rarityHQ.threeWeightPercent,
+		sixWeightPercent = rarityNoHQ.sixWeightPercent - rarityHQ.sixWeightPercent,
+		sevenWeightPercent = rarityNoHQ.sevenWeightPercent - rarityHQ.sevenWeightPercent,
+		elevenWeightPercent = rarityNoHQ.elevenWeightPercent - rarityHQ.elevenWeightPercent,
+		twentyWeightPercent = rarityNoHQ.twentyWeightPercent - rarityHQ.twentyWeightPercent,
+	};
+	return rarityDifference;
+end
+
+func.calcRedBucket = function(clammy)
+	local rarityModifiers = 1;
+	if (clammy.hasHQLegs == false) then
+		rarityModifiers = calcRarityDifference();
+	end
+	if  (clammy.relativeWeight < 6) or
+		(clammy.money >= Config.lowValue[1] and clammy.relativeWeight < 7) or
+		(clammy.money >= Config.midValue[1] and clammy.relativeWeight < 11) or
+		(clammy.money >= Config.highValue[1] and clammy.relativeWeight < 20) or
+		(clammy.weight > 130) then
+		if (Config.alwaysStopAtThirdBucket[1] == true) then
+			clammy.bucketColor = {1.0, 0.1, 0.0, 1.0};
+			if (Config.useStopTone[1] == true) then
+				clammy.stopSound = true;
+			end
+		elseif (Config.alwaysStopAtThirdBucket[1] == false) then
+			local clammingIncidentModifier = 0.9;
+			if (clammy.hasHQBody == true) then
+				clammingIncidentModifier = 0.95;
+			end
+			local modifiedLowValue = math.floor(Config.lowValue[1] * clammingIncidentModifier);
+			local modifiedMidValue = math.floor(Config.midValue[1] * clammingIncidentModifier);
+			local modifiedHighValue = math.floor(Config.highValue[1] * clammingIncidentModifier);
+			if (clammy.relativeWeight < 6) or
+				(clammy.money >= modifiedLowValue and clammy.relativeWeight < 7) or
+				(clammy.money >= modifiedMidValue and clammy.relativeWeight < 11) or
+				(clammy.money >= modifiedHighValue and clammy.relativeWeight < 20) then
+				clammy.bucketColor = {1.0, 0.1, 0.0, 1.0};
+				if (Config.useStopTone[1] == true) then
+					clammy.stopSound = true;
+				end
+			else
+				clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
+				clammy.stopSound = false;
+			end
+		end
+	else
+		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
+		clammy.stopSound = false;
 	end
 	return clammy;
 end
@@ -103,7 +302,7 @@ func.closeLogFile = function(file)
 end
 
 func.writeLogFile = function(clammy, item)
-	local file = func.openLogFile(clammy);
+	local file = func.openLogFile(clammy, true);
 
 	if (file ~= nil) then
 		local fdata = ('%s, %s %s\n'):fmt(os.date('%Y-%m-%d %H:%M:%S'), item.item, item.gil[1]);
@@ -117,240 +316,342 @@ func.renderEditor = function(clammy)
     if (not clammy.editorIsOpen[1]) then
         return clammy;
     end
-    Imgui.SetNextWindowSize({ 500, 450, });
-    Imgui.SetNextWindowSizeConstraints({ 0, 0, }, { FLT_MAX, FLT_MAX, });
-    if (Imgui.Begin('Clammy##Config', clammy.editorIsOpen)) then
+	local settingsTabHeight = 445;
+	local settingsWindowHeight = 560;
+	if (Config.log[1] == true) then
+		settingsTabHeight = settingsTabHeight + 25;
+		settingsWindowHeight = settingsWindowHeight + 25;
+	end
+	if (Config.tone[1] == true) then
+		settingsTabHeight = settingsTabHeight + 25;
+		settingsWindowHeight = settingsWindowHeight + 25;
+	end
+	if (Config.autoResetLog[1] == true) then
+		settingsTabHeight = settingsTabHeight + 50;
+		settingsWindowHeight = settingsWindowHeight + 50;
+	end
+    imgui.SetNextWindowSize({ 500, settingsWindowHeight, });
+    imgui.SetNextWindowSizeConstraints({ 0, 0, }, { FLT_MAX, FLT_MAX, });
+    if (imgui.Begin('Clammy##Config', clammy.editorIsOpen)) then
 
-        if (Imgui.Button('Save Settings')) then
+        if (imgui.Button('Save Settings')) then
             Settings.save();
             print(chat.header(addon.name):append(chat.message('Settings saved.')));
         end
-        Imgui.SameLine();
-        if (Imgui.Button('Reset Settings')) then
+        imgui.SameLine();
+        if (imgui.Button('Reset Settings')) then
             Settings.reset();
             print(chat.header(addon.name):append(chat.message('Settings reset to defaults.')));
         end
-        Imgui.SameLine();
-        if (Imgui.Button('Reset Session')) then
+        imgui.SameLine();
+        if (imgui.Button('Reset Session')) then
             clammy = func.resetSession(clammy);
             print(chat.header(addon.name):append(chat.message('Reset session.')));
         end
 
-        Imgui.Separator();
+        imgui.Separator();
 
-        if (Imgui.BeginTabBar('##clammy_tabbar', ImGuiTabBarFlags_NoCloseWithMiddleMouseButton)) then
-            if (Imgui.BeginTabItem('General', nil)) then
-                func.renderGeneralConfig();
-                Imgui.EndTabItem();
+        if (imgui.BeginTabBar('##clammy_tabbar', ImGuiTabBarFlags_NoCloseWithMiddleMouseButton)) then
+            if (imgui.BeginTabItem('General', nil)) then
+                func.renderGeneralConfig(settingsTabHeight);
+                imgui.EndTabItem();
             end
-            if (Imgui.BeginTabItem('Items', nil)) then
-                func.renderItemListConfig();
-                Imgui.EndTabItem();
+            if (imgui.BeginTabItem('Items', nil)) then
+                func.renderItemListConfig(settingsTabHeight);
+                imgui.EndTabItem();
             end
-            Imgui.EndTabBar();
+            imgui.EndTabBar();
         end
 
     end
-    Imgui.End();
+    imgui.End();
     return clammy;
 end
 
-func.renderGeneralConfig = function()
-    Imgui.Text('General Settings');
-    Imgui.BeginChild('settings_general', { 0, 320, }, true);
-        Imgui.Checkbox('Items in Bucket', Config.showItems);
-        Imgui.ShowHelp('Toggles whether items in current bucket should be shown.');
-        Imgui.Checkbox('Show Session Info', Config.showSessionInfo);
-        Imgui.ShowHelp('Toggles whether total clamming value, gil earned per hour, and buckets purchased should be shown.');
-		Imgui.Checkbox('Split gil/hr and total session value by Vendor/AH', Config.splitItemsBySellType);
-		Imgui.ShowHelp('Toggles whether session info should show split between items sold to vendor and items sold to AH.')
-		Imgui.Checkbox('Log Results', Config.log);
-        Imgui.ShowHelp('Toggles if Clammy should create a log file.');
-        Imgui.Checkbox('Log All Results', Config.logAllResults);
-        Imgui.ShowHelp('Toggles if log file includes all results, or results that you actually collected.');
-        Imgui.Checkbox('Play Tone', Config.tone);
-        Imgui.ShowHelp('Toggles if Clammy should play a tone when you can clam again.');
-        Imgui.Checkbox('Track Moon Info', Config.trackMoonPhase);
-        Imgui.ShowHelp('Toggles if moon phase should be tracked and shown.')
-        Imgui.Checkbox('Set Weight Color Based On Value', Config.colorWeightBasedOnValue);
-        Imgui.ShowHelp('Toggles if the weight in the window should be based on value of the bucket.');
-        Imgui.Checkbox('No clammy outside the bay', Config.hideInDifferentZone);
-        Imgui.ShowHelp('Toggles if the clammy window should hide if not in Bibiki Bay.')
-		Imgui.SetNextItemWidth(100);
-		Imgui.InputInt('High value amount', Config.highValue);
-		Imgui.ShowHelp('Indicates when bucket weight turns red at less than 20 ponze of space remaining.');
-		Imgui.SetNextItemWidth(100);
-		Imgui.InputInt('Medium value amount', Config.midValue);
-		Imgui.ShowHelp('Indicates when bucket weight turns red at less than 11 ponze of space remaining.');
-		Imgui.SetNextItemWidth(100);
-		Imgui.InputInt('Low value amount', Config.lowValue);
-		Imgui.ShowHelp('Indicates when bucket weight turns red at less than 7 ponze of space remaining.');
-    Imgui.EndChild();
+func.renderGeneralConfig = function(settingsTabHeight)
+    imgui.Text('General Settings');
+    imgui.BeginChild('settings_general', { 0, settingsTabHeight, }, true);
+		imgui.SliderFloat('Window Scale', Config.windowScaling, 0.1, 2.0, '%.2f');
+		imgui.ShowHelp('Scale the window bigger/smaller.');
+        imgui.Checkbox('Items in Bucket', Config.showItems);
+        imgui.ShowHelp('Toggles whether items in current bucket should be shown.');
+        imgui.Checkbox('Show Session Info', Config.showSessionInfo);
+        imgui.ShowHelp('Toggles whether total clamming value, gil earned per hour, and buckets purchased should be shown.');
+		imgui.Checkbox('Split gil/hr and total session value by Vendor/AH', Config.splitItemsBySellType);
+		imgui.ShowHelp('Toggles whether session info should show split between items sold to vendor and items sold to AH.');
+        imgui.Checkbox('Track Moon Info', Config.trackMoonPhase);
+        imgui.ShowHelp('Toggles if moon phase should be tracked and shown.');
+        imgui.Checkbox('Set Weight Color Based On Value', Config.colorWeightBasedOnValue);
+        imgui.ShowHelp('Toggles if the weight in the window should be based on value of the bucket.');
+		imgui.Checkbox('Show Profit', Config.subtractBucketCostFromGilEarned);
+		imgui.ShowHelp('Subtract cost of buckets from total clamming value amount.');
+		imgui.Checkbox('Show Time per Bucket', Config.showAverageTimePerBucket);
+		imgui.ShowHelp('Calculate and show average time per bucket received.');
+		imgui.Checkbox('Show % chance bucket break', Config.showPercentChanceToBreak);
+		imgui.ShowHelp('Calculates the chance that the next clamming attempt will break your bucket.');
+		imgui.Checkbox('Show equipment status', Config.checkEquippedItem);
+		imgui.ShowHelp('Shows whether you are wearing the HQ clamming set.');
+		imgui.Checkbox('No clammy outside the bay', Config.hideInDifferentZone);
+        imgui.ShowHelp('Toggles if the clammy window should hide if not in Bibiki Bay.');
+		imgui.Checkbox('Always Stop After 3rd Bucket', Config.alwaysStopAtThirdBucket);
+		imgui.ShowHelp('Always turns the bucket color red at 131 or more weight.');
+		imgui.Checkbox('Log Results', Config.log);
+        imgui.ShowHelp('Toggles if Clammy should create a log file.');
+		if (Config.log[1] == true) then
+			imgui.SetCursorPosX(20); imgui.Checkbox('Legacy logging', Config.legacyLog);
+        	imgui.ShowHelp('Use if you want to maintain consistent logging with 0.4 version or earlier.');
+		end
+        imgui.Checkbox('Play Tone', Config.tone);
+        imgui.ShowHelp('Toggles if Clammy should play a tone when you can clam again.');
+		if (Config.tone[1] == true) then
+			imgui.SetCursorPosX(20); imgui.Checkbox('Stop Tone', Config.useStopTone);
+			imgui.ShowHelp('Play separate tone when at recommended turn in weight.')
+		end
+		imgui.Checkbox('Auto Reset Log', Config.autoResetLog);
+		imgui.ShowHelp('Automatically resets log file after no clamming actions are taken for some time.');
+		if (Config.autoResetLog[1] == true) then
+			imgui.SetCursorPosX(20); imgui.Checkbox('Reset Session', Config.resetFullSession);
+			imgui.ShowHelp('Reset just log file or full session.');
+			imgui.SetCursorPosX(20); imgui.SetNextItemWidth(100); imgui.InputInt('Minutes Before Reset', Config.minutesBeforeAutoReset);
+			imgui.ShowHelp('Time in minutes before automatically resetting log file.');
+		end
+		imgui.SetNextItemWidth(100);
+		imgui.InputInt('High value amount', Config.highValue);
+		imgui.ShowHelp('Indicates when bucket weight turns red at less than 20 ponze of space remaining.');
+		imgui.SetNextItemWidth(100);
+		imgui.InputInt('Medium value amount', Config.midValue);
+		imgui.ShowHelp('Indicates when bucket weight turns red at less than 11 ponze of space remaining.');
+		imgui.SetNextItemWidth(100);
+		imgui.InputInt('Low value amount', Config.lowValue);
+		imgui.ShowHelp('Indicates when bucket weight turns red at less than 7 ponze of space remaining.');
+    imgui.EndChild();
 end
 
-func.renderItemListConfig = function()
-    Imgui.BeginChild("settings_items", {0, 320, }, true);
-		Imgui.Text('    Item Value:');
-		Imgui.ShowHelp('Set sale price of item.');
-		Imgui.SameLine();
-		Imgui.Text('                Vendor:')
-		Imgui.ShowHelp('Check whether to sell to a vendor or the AH.');
-		Imgui.Separator();
-		Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[1].item .. '      ', Config.items[1].gil); -- Bibiki slug      -- 17
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[1].item, Config.items[1].vendor);
-		Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[2].item .. '    ', Config.items[2].gil); -- Bibiki urchin
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[2].item, Config.items[2].vendor);
-		Imgui.SetNextItemWidth(100);
-        Imgui.InputInt('Bkn. willow rod  ', Config.items[3].gil); -- Broken willow fishing rod
-		Imgui.SameLine();
-		Imgui.Checkbox('Bkn. willow rod', Config.items[3].vendor, 'Bkn. willow rod');
-		Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[4].item .. '   ', Config.items[4].gil); -- Coral fragment
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[4].item, Config.items[4].vendor, Config.items[4].item);
-		Imgui.SetNextItemWidth(100);
-        Imgui.InputInt('H.Q. crab shell  ', Config.items[5].gil); -- Quality crab shell
-        Imgui.SameLine();
-		Imgui.Checkbox(Config.items[5].item, Config.items[5].vendor, 'H.Q. crab shell');
-		Imgui.SetNextItemWidth(100);
-		Imgui.InputInt(Config.items[6].item .. '       ', Config.items[6].gil); -- Crab shell
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[6].item, Config.items[6].vendor, Config.items[6].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[7].item .. '  ', Config.items[7].gil); -- Elshimo coconut (Not in Horizon)
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[7].item, Config.items[7].vendor, Config.items[7].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[8].item .. '          ', Config.items[8].gil); -- Elm log
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[8].item, Config.items[8].vendor, Config.items[8].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[9].item .. '      ', Config.items[9].gil); -- Fish scales
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[9].item, Config.items[9].vendor, Config.items[9].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[10].item .. '     ', Config.items[10].gil); -- Goblin armor
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[10].item, Config.items[10].vendor, Config.items[10].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[11].item .. '      ', Config.items[11].gil); -- Goblin mail
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[11].item, Config.items[11].vendor, Config.items[11].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[12].item .. '      ', Config.items[12].gil); -- Goblin mask
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[12].item, Config.items[12].vendor, Config.items[12].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[13].item .. '  ', Config.items[13].gil); -- Hobgoblin bread
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[13].item, Config.items[13].vendor, Config.items[13].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[14].item .. '    ', Config.items[14].gil); -- Hobgoblin pie
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[14].item, Config.items[14].vendor, Config.items[14].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[15].item .. '     ', Config.items[15].gil); -- Igneous rock (Not on Horizon)
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[15].item, Config.items[15].vendor, Config.items[15].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[16].item .. '         ', Config.items[16].gil); -- Jacknife
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[16].item, Config.items[16].vendor, Config.items[16].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[17].item .. ' ', Config.items[17].gil); -- Lacquer tree log
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[17].item, Config.items[17].vendor, Config.items[17].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[18].item .. '        ', Config.items[18].gil); -- Maple log
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[18].item, Config.items[18].vendor, Config.items[18].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[19].item .. '       ', Config.items[19].gil); -- Nebimonite
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[19].item, Config.items[19].vendor, Config.items[19].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[20].item .. '          ', Config.items[20].gil); -- Oxblood
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[20].item, Config.items[20].vendor, Config.items[20].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[21].item .. '          ', Config.items[21].gil); -- Pamamas
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[21].item, Config.items[21].vendor, Config.items[21].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[22].item .. '      ', Config.items[22].gil); -- Pamtam kelp
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[22].item, Config.items[22].vendor, Config.items[22].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[23].item .. '           ', Config.items[23].gil); -- Pebble
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[23].item, Config.items[23].vendor, Config.items[23].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[24].item .. '    ', Config.items[24].gil); -- Petrified log
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[24].item, Config.items[24].vendor, Config.items[24].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt('H.Q. pugil Scls. ', Config.items[25].gil); -- Quality pugil scales
-		Imgui.SameLine();
-		Imgui.Checkbox('H.Q. pugil Scls.', Config.items[25].vendor, Config.items[25].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[26].item .. '     ', Config.items[26].gil); -- Pugil scales
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[26].item, Config.items[26].vendor, Config.items[26].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[27].item .. '        ', Config.items[27].gil); -- Rock salt (Not on Horizon)
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[27].item, Config.items[27].vendor, Config.items[27].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[28].item .. '         ', Config.items[28].gil); -- Seashell
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[28].item, Config.items[28].vendor, Config.items[28].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[29].item .. '      ', Config.items[29].gil); -- Shall shell
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[29].item, Config.items[29].vendor, Config.items[29].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[30].item .. ' ', Config.items[30].gil); -- Titanictus shell
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[30].item, Config.items[30].vendor, Config.items[30].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[31].item .. '    ', Config.items[31].gil); -- Tropical clam
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[31].item, Config.items[31].vendor, Config.items[31].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[32].item .. '     ', Config.items[32].gil); -- Turtle shell
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[32].item, Config.items[32].vendor, Config.items[32].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[33].item .. '   ', Config.items[33].gil); -- Uragnite shell
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[33].item, Config.items[33].vendor, Config.items[33].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[34].item .. '     ', Config.items[34].gil); -- Vongola clam
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[34].item, Config.items[34].vendor, Config.items[34].item);
-        Imgui.SetNextItemWidth(100);
-        Imgui.InputInt(Config.items[35].item .. '       ', Config.items[35].gil); -- White sand
-		Imgui.SameLine();
-		Imgui.Checkbox(Config.items[35].item, Config.items[35].vendor, Config.items[35].item);
-    Imgui.EndChild();
+func.renderItemListConfig = function(settingsTabHeight)
+    imgui.BeginChild("settings_items", {0, settingsTabHeight, }, true);
+		imgui.Text('    Item Value:');
+		imgui.ShowHelp('Set sale price of item.');
+		imgui.SameLine();
+		imgui.Text('                Vendor:')
+		imgui.ShowHelp('Check whether to sell to a vendor or the AH.');
+		imgui.Separator();
+		imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[1].item .. '      ', Config.items[1].gil); -- Bibiki slug      -- 17
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[1].item, Config.items[1].vendor);
+		imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[2].item .. '    ', Config.items[2].gil); -- Bibiki urchin
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[2].item, Config.items[2].vendor);
+		imgui.SetNextItemWidth(100);
+        imgui.InputInt('Bkn. willow rod  ', Config.items[3].gil); -- Broken willow fishing rod
+		imgui.SameLine();
+		imgui.Checkbox('Bkn. willow rod', Config.items[3].vendor, 'Bkn. willow rod');
+		imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[4].item .. '   ', Config.items[4].gil); -- Coral fragment
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[4].item, Config.items[4].vendor, Config.items[4].item);
+		imgui.SetNextItemWidth(100);
+        imgui.InputInt('H.Q. crab shell  ', Config.items[5].gil); -- Quality crab shell
+        imgui.SameLine();
+		imgui.Checkbox(Config.items[5].item, Config.items[5].vendor, 'H.Q. crab shell');
+		imgui.SetNextItemWidth(100);
+		imgui.InputInt(Config.items[6].item .. '       ', Config.items[6].gil); -- Crab shell
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[6].item, Config.items[6].vendor, Config.items[6].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[7].item .. '  ', Config.items[7].gil); -- Elshimo coconut (Not in Horizon)
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[7].item, Config.items[7].vendor, Config.items[7].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[8].item .. '          ', Config.items[8].gil); -- Elm log
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[8].item, Config.items[8].vendor, Config.items[8].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[9].item .. '      ', Config.items[9].gil); -- Fish scales
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[9].item, Config.items[9].vendor, Config.items[9].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[10].item .. '     ', Config.items[10].gil); -- Goblin armor
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[10].item, Config.items[10].vendor, Config.items[10].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[11].item .. '      ', Config.items[11].gil); -- Goblin mail
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[11].item, Config.items[11].vendor, Config.items[11].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[12].item .. '      ', Config.items[12].gil); -- Goblin mask
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[12].item, Config.items[12].vendor, Config.items[12].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[13].item .. '  ', Config.items[13].gil); -- Hobgoblin bread
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[13].item, Config.items[13].vendor, Config.items[13].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[14].item .. '    ', Config.items[14].gil); -- Hobgoblin pie
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[14].item, Config.items[14].vendor, Config.items[14].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[15].item .. '     ', Config.items[15].gil); -- Igneous rock (Not on Horizon)
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[15].item, Config.items[15].vendor, Config.items[15].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[16].item .. '         ', Config.items[16].gil); -- Jacknife
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[16].item, Config.items[16].vendor, Config.items[16].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[17].item .. ' ', Config.items[17].gil); -- Lacquer tree log
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[17].item, Config.items[17].vendor, Config.items[17].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[18].item .. '        ', Config.items[18].gil); -- Maple log
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[18].item, Config.items[18].vendor, Config.items[18].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[19].item .. '       ', Config.items[19].gil); -- Nebimonite
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[19].item, Config.items[19].vendor, Config.items[19].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[20].item .. '          ', Config.items[20].gil); -- Oxblood
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[20].item, Config.items[20].vendor, Config.items[20].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[21].item .. '          ', Config.items[21].gil); -- Pamamas
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[21].item, Config.items[21].vendor, Config.items[21].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[22].item .. '      ', Config.items[22].gil); -- Pamtam kelp
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[22].item, Config.items[22].vendor, Config.items[22].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[23].item .. '           ', Config.items[23].gil); -- Pebble
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[23].item, Config.items[23].vendor, Config.items[23].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[24].item .. '    ', Config.items[24].gil); -- Petrified log
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[24].item, Config.items[24].vendor, Config.items[24].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt('H.Q. pugil Scls. ', Config.items[25].gil); -- Quality pugil scales
+		imgui.SameLine();
+		imgui.Checkbox('H.Q. pugil Scls.', Config.items[25].vendor, Config.items[25].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[26].item .. '     ', Config.items[26].gil); -- Pugil scales
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[26].item, Config.items[26].vendor, Config.items[26].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[27].item .. '        ', Config.items[27].gil); -- Rock salt (Not on Horizon)
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[27].item, Config.items[27].vendor, Config.items[27].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[28].item .. '         ', Config.items[28].gil); -- Seashell
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[28].item, Config.items[28].vendor, Config.items[28].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[29].item .. '      ', Config.items[29].gil); -- Shall shell
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[29].item, Config.items[29].vendor, Config.items[29].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[30].item .. ' ', Config.items[30].gil); -- Titanictus shell
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[30].item, Config.items[30].vendor, Config.items[30].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[31].item .. '    ', Config.items[31].gil); -- Tropical clam
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[31].item, Config.items[31].vendor, Config.items[31].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[32].item .. '     ', Config.items[32].gil); -- Turtle shell
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[32].item, Config.items[32].vendor, Config.items[32].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[33].item .. '   ', Config.items[33].gil); -- Uragnite shell
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[33].item, Config.items[33].vendor, Config.items[33].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[34].item .. '     ', Config.items[34].gil); -- Vongola clam
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[34].item, Config.items[34].vendor, Config.items[34].item);
+        imgui.SetNextItemWidth(100);
+        imgui.InputInt(Config.items[35].item .. '       ', Config.items[35].gil); -- White sand
+		imgui.SameLine();
+		imgui.Checkbox(Config.items[35].item, Config.items[35].vendor, Config.items[35].item);
+    imgui.EndChild();
 end
 
 func.resetSession = function(clammy)
 	clammy.startingTime = os.clock();
+	clammy.lastClammingAction = os.clock();
 	clammy.fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
+	clammy.filePathBroken =('log_broken_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
 	clammy.filePath = clammy.fileDir .. clammy.fileName;
 	clammy = func.emptyBucket(clammy, false, true);
 	clammy.gilPerHour = 0;
+	clammy.gilPerHourMinusBucket = 0;
 	clammy.gilPerHourAH = 0;
 	clammy.gilPerHourNPC = 0;
 	clammy.bucketsPurchased = 0;
+	clammy.bucketsReceived = 0;
 	clammy.sessionValue = 0;
 	clammy.sessionValueAH = 0;
 	clammy.sessionValueNPC = 0;
+	clammy.bucketIsBroke = false;
+	return clammy;
+end
+
+func.sessionTimeout = function(clammy)
+	if(Config.resetFullSession[1] == true) then
+		clammy.bucketsPurchased = 0;
+		clammy.bucketsReceived = 0;
+		clammy.sessionValue = 0;
+		clammy.sessionValueAH = 0;
+		clammy.sessionValueNPC = 0;
+		clammy.trueSessionValue = 0;
+		clammy.trueSessionValueNPC = 0;
+		clammy.trueSessionValueAH = 0;
+		clammy.bucketIsBroke = false;
+	end
+	clammy.startingTime = os.clock();
+	clammy.lastClammingAction = os.clock();
+	clammy.fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
+	clammy.filePathBroken =('log_broken_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
+	clammy.filePath = clammy.fileDir .. clammy.fileName;
+	clammy.gilPerHour = 0;
+	clammy.gilPerHourMinusBucket = 0;
+	clammy.gilPerHourAH = 0;
+	clammy.gilPerHourNPC = 0;
+	clammy.bucketAverageTime = 0;
+	clammy.bucketTimeWith = 0;
+	return clammy;
+end
+
+func.getCurrentEquip = function(clammy)
+    local inv = AshitaCore:GetMemoryManager():GetInventory();
+    local bodyEquip = inv:GetEquippedItem(5);
+    local bodyIndex = bit.band(bodyEquip.Index, 0x00FF);
+    local bodyContainer = bit.band(bodyEquip.Index, 0xFF00) / 256;
+    local bodyItem = inv:GetContainerItem(bodyContainer, bodyIndex);
+	local bodyItemId = bodyItem.Id;
+
+	clammy.hasHQBody = false;
+	clammy.bodyItemId = bodyItemId;
+
+	local legEquip = inv:GetEquippedItem(7);
+	local legIndex = bit.band(legEquip.Index, 0x00FF);
+	local legContainer = bit.band(legEquip.Index, 0xFF00) / 256;
+	local legItem = inv:GetContainerItem(legContainer, legIndex);
+	local legItemId = legItem.Id;
+
+	clammy.hasHQLegs = false;
+	clammy.legItemId = legItemId;
+
+	for _, item in ipairs(const.hqGearIndexes) do
+		if item.id == bodyItemId then
+			clammy.hasHQBody = true;
+		end
+		if item.id == legItemId then
+			clammy.hasHQLegs = true;
+		end
+	end
 	return clammy;
 end
 
@@ -377,6 +678,37 @@ func.formatInt = function(number)
     end
 end
 
+func.getTimestamp = function()
+    local pVanaTime = ashita.memory.find('FFXiMain.dll', 0, 'B0015EC390518B4C24088D4424005068', 0, 0);
+    local pointer = ashita.memory.read_uint32(pVanaTime + 0x34);
+    local rawTime = ashita.memory.read_uint32(pointer + 0x0C) + 92514960;
+    local timestamp = {};
+    timestamp.day = math.floor(rawTime / 3456);
+    timestamp.hour = math.floor(rawTime / 144) % 24;
+    timestamp.minute = math.floor((rawTime % 144) / 2.4);
+    return timestamp;
+end
+
+func.getMoon = function(clammy)
+    local timestamp = func.getTimestamp();
+    local moonIndex = ((timestamp.day + 26) % 84) + 1;
+    if (moonIndex < 43) then
+		clammy.moonTable.moonPercent = const.moonPhasePercent[moonIndex]  * -1;
+	else
+		clammy.moonTable.moonPercent = const.moonPhasePercent[moonIndex];
+	end
+    clammy.moonTable.moonPhase = const.moonPhase[moonIndex];
+    return clammy;
+end
+
+func.formatTimestamp = function(timer)
+    local hours = math.floor(timer / 3600);
+    local minutes = math.floor((timer / 60) - (hours * 60));
+    local seconds = math.floor(timer - (hours * 3600) - (minutes * 60));
+
+    return ('%0.2i:%0.2i:%0.2i'):fmt(hours, minutes, seconds);
+end
+
 func.toggleShowValue = function(shouldShowValue)
 	if (shouldShowValue == "true") or (shouldShowValue == nil and Config.showValue[1] == false) then
 		Config.showValue[1] = true;
@@ -390,12 +722,12 @@ end
 
 func.toggleLogAllResults = function(shouldLogAllResults)
 	if (shouldLogAllResults == "true") or
-        (shouldLogAllResults == nil and Config.logAllResults[1] == false) then
-		Config.logAllResults[1] = true;
+        (shouldLogAllResults == nil and Config.legacyLog[1] == false) then
+		Config.legacyLog[1] = true;
 		print(chat.header(addon.name):append(chat.message('Logging all items.')));
 	elseif(shouldLogAllResults == "false") or
-        (shouldLogAllResults == nil and Config.logAllResults[1] == true) then
-		Config.logAllResults[1] = false;
+        (shouldLogAllResults == nil and Config.legacyLog[1] == true) then
+		Config.legacyLog[1] = false;
 		print(chat.header(addon.name):append(chat.message('Logging only items actually received.')));
 	end
 
@@ -503,37 +835,6 @@ func.toggleTrackMoon = function(shouldShowMoon)
     Settings.save();
 end
 
-func.getTimestamp = function()
-    local pVanaTime = ashita.memory.find('FFXiMain.dll', 0, 'B0015EC390518B4C24088D4424005068', 0, 0);
-    local pointer = ashita.memory.read_uint32(pVanaTime + 0x34);
-    local rawTime = ashita.memory.read_uint32(pointer + 0x0C) + 92514960;
-    local timestamp = {};
-    timestamp.day = math.floor(rawTime / 3456);
-    timestamp.hour = math.floor(rawTime / 144) % 24;
-    timestamp.minute = math.floor((rawTime % 144) / 2.4);
-    return timestamp;
-end
-
-func.getMoon = function(clammy)
-    local timestamp = func.getTimestamp();
-    local moonIndex = ((timestamp.day + 26) % 84) + 1;
-    if (moonIndex < 43) then
-		clammy.moonTable.moonPercent = const.moonPhasePercent[moonIndex]  * -1;
-	else
-		clammy.moonTable.moonPercent = const.moonPhasePercent[moonIndex];
-	end
-    clammy.moonTable.moonPhase = const.moonPhase[moonIndex];
-    return clammy;
-end
-
-func.formatTimestamp = function(timer)
-    local hours = math.floor(timer / 3600);
-    local minutes = math.floor((timer / 60) - (hours * 60));
-    local seconds = math.floor(timer - (hours * 3600) - (minutes * 60));
-
-    return ('%0.2i:%0.2i:%0.2i'):fmt(hours, minutes, seconds);
-end
-
 func.handleChatCommands = function(args, clammy)
     if (#args == 1) then
 		clammy.editorIsOpen[1] = true;
@@ -557,6 +858,15 @@ func.handleChatCommands = function(args, clammy)
 		print(chat.header(addon.name):append(chat.message(('Weight manually set to %s.'):fmt(clammy.weight))));
         return clammy;
     end
+
+	if (args[2]:any('debug')) then
+		if(args[3]:any('additem')) then
+			
+		elseif (args[3]:any('setbucketsize')) then
+			clammy.bucketSize = tonumber(args[4]);
+		end
+		return clammy;
+	end
 
     if (args[2]:any('showvalue')) then --turns loggin on/off
         func.toggleShowValue(args[3])
@@ -604,6 +914,7 @@ end
 
 func.handleTextIn = function(e, clammy)
 
+	local now = os.clock();
     local weightColor = {
         {diff=200, color={1.0, 1.0, 1.0, 1.0}},
         {diff=35, color={1.0, 1.0, 0.8, 1.0}},
@@ -617,20 +928,29 @@ func.handleTextIn = function(e, clammy)
     if (string.match(e.message, "You return the")) then
 		clammy = func.emptyBucket(clammy, true, false);
 		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
+		clammy = func.calculateTimePerBucket(clammy);
+		clammy.lastClammingAction = now;
 		return clammy;
 	end
 
 	if (string.match(e.message, "Obtained key item:")) then
 		clammy.bucketsPurchased = clammy.bucketsPurchased + 1;
+		clammy.bucketsReceived = clammy.bucketsReceived + 1;
 		clammy.hasBucket = true;
 		clammy.bucketIsBroke = false;
+		clammy.bucketStartTime = os.clock();
         return clammy;
 	end
 
 	--Your clamming capacity has increased to XXX ponzes!
 	if (string.match(e.message, "Your clamming capacity has increased to")) then
 		clammy.bucketSize = clammy.bucketSize + 50;
+		clammy.bucketsReceived = clammy.bucketsReceived + 1;
 		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
+		clammy = func.calculateTimePerBucket(clammy);
+		clammy.bucketStartTime = os.clock();
+		clammy.relativeWeight = clammy.relativeWeight + 50;
+		clammy.lastClammingAction = now;
 		return clammy;
 	end
 
@@ -638,6 +958,15 @@ func.handleTextIn = function(e, clammy)
 		clammy = func.emptyBucket(clammy, false, false);
 		clammy.bucketIsBroke = true;
 		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
+		clammy = func.calculateTimePerBucket(clammy);
+		clammy.playTone = true;
+		clammy.stopSound = true;
+		return clammy;
+	end
+
+	if (string.match(e.message, 'Why you ungrateful sonnuva...')) then
+		clammy.bucketIsBroke = false;
+		clammy.hasBucket = false;
 		return clammy;
 	end
 
@@ -645,6 +974,7 @@ func.handleTextIn = function(e, clammy)
 		for idx,citem in ipairs(clammy.items) do
 			if (string.match(string.lower(e.message), string.lower(citem.item)) ~= nil) then
 				clammy = func.writeBucket(clammy, citem);
+				clammy.lastClammingAction = now;
 				clammy.weight = clammy.weight + citem.weight;
 				clammy.money = clammy.money + citem.gil[1];
 				clammy.bucket[idx] = clammy.bucket[idx] + 1;
@@ -657,21 +987,12 @@ func.handleTextIn = function(e, clammy)
 						end
 					end
 				else
-					local relativeWeight = clammy.bucketSize - clammy.weight;
-					if  (relativeWeight < 6) or
-						(clammy.money >= clammy.lowValue and relativeWeight < 7) or
-						(clammy.money >= clammy.midValue and relativeWeight < 11) or
-						(clammy.money >= clammy.highValue and relativeWeight < 20) or
-						(clammy.weight > 130) then
-						clammy.bucketColor = {1.0, 0.1, 0.0, 1.0};
-					else
-						clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
-					end
+					clammy.relativeWeight = clammy.bucketSize - clammy.weight;
 				end
-
+				clammy.hasBucket = true;
 				clammy.playTone = true;
 
-				if (Config.log[1] == true) and (Config.logAllResults[1] == true) then
+				if (Config.log[1] == true) and (Config.legacyLog[1] == true) then
 					clammy.writeLogFile(citem);
 				end
 
@@ -680,6 +1001,182 @@ func.handleTextIn = function(e, clammy)
 		end
 	end
     return clammy;
+end
+
+func.renderClammy = function(clammy)
+	local windowSize = (300 * Config.windowScaling[1]);
+    imgui.SetNextWindowBgAlpha(0.8);
+    imgui.SetNextWindowSize({ windowSize, -1, }, ImGuiCond_Always);
+	clammy = func.getCurrentEquip(clammy);
+	local now = os.clock();
+	local timeBeforeReset = now - (Config.minutesBeforeAutoReset[1] * 60);
+	if (clammy.lastClammingAction < timeBeforeReset) and
+		(Config.autoResetLog[1] == true) and
+		(clammy.hasBucket == false) then
+		clammy = func.sessionTimeout(clammy);
+	end
+
+	if (imgui.Begin('Clammy', true, bit.bor(ImGuiWindowFlags_NoDecoration))) then
+
+		local normalFontSize = 1 * Config.windowScaling[1];
+		local enlargedFontSize = 1.3 * Config.windowScaling[1];
+		if (clammy.hasBucket == true) then
+			imgui.TextColored({0.0, 1.0, 0.0, 1.0}, "Bucket")
+		elseif(clammy.bucketIsBroke == true) then
+			imgui.TextColored({0.1, 0.1, 0.1, 1.0}, "Bucket")
+		else
+			imgui.TextColored({0.9, 0.9, 0.0, 1.0}, "Bucket")
+		end
+		if (Config.trackMoonPhase[1] == true) then
+			clammy = func.getMoon(clammy);
+		end
+		clammy = func.calcRedBucket(clammy);
+		imgui.SameLine()
+		imgui.Text("Weight [" .. clammy.bucketSize .. "]:");
+		imgui.SameLine();
+		imgui.SetWindowFontScale(enlargedFontSize);
+		imgui.SetCursorPosY(imgui.GetCursorPosY() - (2 * Config.windowScaling[1]));
+		imgui.TextColored(clammy.bucketColor, tostring(clammy.weight));
+		imgui.SetWindowFontScale(normalFontSize);
+		imgui.SameLine();
+		imgui.SetCursorPosX(imgui.GetCursorPosX() + imgui.GetColumnWidth() - imgui.GetStyle().FramePadding.x - imgui.CalcTextSize("[999]"));
+		local cdTime = math.floor(clammy.cooldown - os.clock());
+		if (Config.useStopTone[1] == true and clammy.stopSound == true) then
+			cdTime = cdTime - 9;
+		end
+		if (cdTime <= 0) then
+			imgui.TextColored({ 0.5, 1.0, 0.5, 1.0 }, "  [*]");
+			clammy = func.playSound(clammy);
+		else
+			imgui.TextColored({ 1.0, 1.0, 0.5, 1.0 }, "  [" .. cdTime .. "]");
+		end
+		if (Config.showPercentChanceToBreak[1] == true) then
+			local bucketBreakChance = func.calculateChanceOfBreak(clammy, (clammy.bucketSize - clammy.weight));
+			imgui.Text("Percent chance to break: "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:  "));
+			imgui.SetWindowFontScale(enlargedFontSize); imgui.SetCursorPosY(imgui.GetCursorPosY() - (2 * Config.windowScaling[1]));
+			imgui.TextColored(bucketBreakChance.color, func.formatChanceBreak(bucketBreakChance.percentWeight)); imgui.SameLine();
+			imgui.SetWindowFontScale(normalFontSize); imgui.SetCursorPosY(imgui.GetCursorPosY() + (2 * Config.windowScaling[1]));
+			if (string.len(bucketBreakChance.percentWeight) == 1) then
+				imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:   " .. bucketBreakChance.percentWeight));
+			elseif (string.len(bucketBreakChance.percentWeight) == 3) then
+				imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:    " .. bucketBreakChance.percentWeight));
+			elseif (string.len(bucketBreakChance.percentWeight) == 4) then
+				imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:    " .. bucketBreakChance.percentWeight));
+			elseif (string.len(bucketBreakChance.percentWeight) == 5) then
+				imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:    " .. bucketBreakChance.percentWeight));
+			end
+			imgui.Text("%");
+		end
+		if (Config.showValue[1] == true) then
+			imgui.Text("Estimated Value: " .. func.formatInt(clammy.money));
+		end
+		local textColor = {0.0, 0.75, 0.60, 1};
+		if (Config.showSessionInfo[1] == true) then
+			if Config.subtractBucketCostFromGilEarned[1] == true then
+				clammy.trueSessionValue = clammy.sessionValue - (clammy.bucketsPurchased * 500);
+			else
+				clammy.trueSessionValue = clammy.sessionValue
+			end
+			clammy.trueSessionValueNPC = clammy.sessionValueNPC;
+			clammy.trueSessionValueAH = clammy.sessionValueAH;
+			imgui.Separator();
+			if(Config.subtractBucketCostFromGilEarned[1] == true) then
+				imgui.Text("Gil made"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Gil made  "));
+				imgui.TextColored(textColor,"(Profit)"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Gil made  (Profit)"));
+				imgui.Text(":"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
+				imgui.Text("".. func.formatInt(clammy.sessionValue)); imgui.SameLine();
+				imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   " .. func.formatInt(clammy.sessionValue) .. " "));
+				imgui.TextColored(textColor, "(" .. func.formatInt(clammy.trueSessionValue) .. ")");
+			else
+				imgui.Text("Gil made: "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
+				imgui.Text("" .. func.formatInt(clammy.trueSessionValue));
+			end
+
+			if (Config.splitItemsBySellType[1] == true) then
+				imgui.Text("Total gil earned(NPC): "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
+				imgui.Text("" .. func.formatInt(clammy.trueSessionValueNPC));
+				imgui.Text("Total gil earned(AH): "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
+				imgui.Text("" .. func.formatInt(clammy.trueSessionValueAH));
+			end
+			if(Config.subtractBucketCostFromGilEarned[1] == true) then
+				imgui.Text("Gil/hr"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Gil/hr  "));
+				imgui.TextColored(textColor, "(Profit)"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Gil/hr  (Profit)"));
+				imgui.Text(":"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
+				imgui.Text(""  .. func.formatInt(clammy.gilPerHour)) imgui.SameLine();
+				imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "   .. func.formatInt(clammy.gilPerHour) .. " "));
+				imgui.TextColored(textColor, "(" .. func.formatInt(clammy.gilPerHourMinusBucket) .. ")");
+			else
+				imgui.Text("Gil/hr: "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
+				imgui.Text("" .. func.formatInt(clammy.gilPerHour));
+			end
+			if (Config.splitItemsBySellType[1] == true) then
+				imgui.Text("Gil/hr(NPC): "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
+				imgui.Text("" .. func.formatInt(clammy.gilPerHourNPC));
+				imgui.Text("Gil/hr(AH): "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
+				imgui.Text("" .. func.formatInt(clammy.gilPerHourAH));
+			end
+			imgui.Separator();
+
+			if (Config.subtractBucketCostFromGilEarned[1] == true) then
+				local bucketCost = clammy.bucketsPurchased * 500;
+				imgui.Text("Buckets"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets "));
+				imgui.TextColored(textColor, "(Bought)(Spent)"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets (Bought)(Spent)"));
+				imgui.Text(": " .. clammy.bucketsReceived); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets  Bought)(Gil):    " .. clammy.bucketsReceived));
+				imgui.TextColored(textColor, "(".. func.formatInt(clammy.bucketsPurchased) .. ")(" .. func.formatInt(bucketCost) .. ")");
+			else
+				imgui.Text("Buckets : "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets  (Gil spent):   "));
+				imgui.Text("" .. clammy.bucketsPurchased);
+			end
+			local now = os.clock();
+			imgui.Text("Session length:"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets (Bought)(Spent): "));
+			imgui.Text("".. func.formatTimestamp(now - clammy.startingTime))
+			if Config.showAverageTimePerBucket[1] == true then
+				imgui.Text('Avg time/bucket:'); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets (Bought)(Spent): "));
+				imgui.Text('' .. func.formatTimestamp(clammy.bucketAverageTime));
+			end
+		end
+		if (Config.trackMoonPhase[1] == true) then
+			imgui.Separator();
+			imgui.Text("Current moon phase is: " .. clammy.moonTable.moonPhase);
+			imgui.Text("Current moon phase percentage is: " .. clammy.moonTable.moonPercent .. "%");
+		end
+
+		if (Config.checkEquippedItem[1] == true) then
+			imgui.Separator();
+			imgui.Text('HQ legs: ') imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize('HQ legs:  '));
+			if clammy.hasHQLegs == true then
+				imgui.TextColored({0, 1, 0, 1}, tostring(clammy.hasHQLegs)); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize('HQ legs:  '.. tostring(clammy.hasHQLegs)));
+			else
+				imgui.TextColored({1, 0, 0, 1}, tostring(clammy.hasHQLegs)); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize('HQ legs:  '.. tostring(clammy.hasHQLegs)));
+			end
+			imgui.Text(' HQ body: ');  imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize('HQ legs:  '.. tostring(clammy.hasHQLegs) .. ' HQ body: '));
+			if clammy.hasHQBody == true then
+				imgui.TextColored({0, 1, 0, 1}, tostring(clammy.hasHQBody));
+			else
+				imgui.TextColored({1, 0, 0, 1}, tostring(clammy.hasHQBody));
+			end
+		end
+
+		if (Config.showItems[1] == true) then
+			if clammy.showItemSeparator == true then
+				imgui.Separator();
+			end
+			for idx,citem in ipairs(Config.items) do
+				if (clammy.bucket[idx] ~= 0) then
+					clammy.showItemSeparator = true;
+					imgui.Text(" - " .. Config.items[idx].item .. " [" .. clammy.bucket[idx] .. "]");
+					imgui.SameLine();
+					local valTxt = "(" .. func.formatInt(Config.items[idx].gil[1] * clammy.bucket[idx]) .. ")"
+					local x, _  = imgui.CalcTextSize(valTxt);
+					imgui.SetCursorPosX(imgui.GetCursorPosX() + imgui.GetColumnWidth() - x - imgui.GetStyle().FramePadding.x);
+					imgui.Text(valTxt);
+
+				end
+			end
+		end
+    end
+    imgui.End();
+	return clammy;
 end
 
 return func;
