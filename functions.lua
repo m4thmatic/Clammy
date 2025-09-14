@@ -392,7 +392,7 @@ func.renderGeneralConfig = function(settingsTabHeight)
 		imgui.Checkbox('Show equipment status', Config.checkEquippedItem);
 		imgui.ShowHelp('Shows whether you are wearing the HQ clamming set.');
 		imgui.Checkbox('No clammy outside the bay', Config.hideInDifferentZone);
-        imgui.ShowHelp('Toggles if the clammy window should hide if not in Bibiki Bay.');
+        imgui.ShowHelp('What happens in Bibiki Bay stays in Bibiki Bay?');
 		imgui.Checkbox('Always Stop After 3rd Bucket', Config.alwaysStopAtThirdBucket);
 		imgui.ShowHelp('Always turns the bucket color red at 131 or more weight.');
 		imgui.Checkbox('Log Results', Config.log);
@@ -626,10 +626,10 @@ end
 
 func.getCurrentEquip = function(clammy)
     local inv = AshitaCore:GetMemoryManager():GetInventory();
-	if (inv == nil) then
+    local bodyEquip = inv:GetEquippedItem(5);
+	if (bodyEquip == nil) then
 		return clammy;
 	end
-    local bodyEquip = inv:GetEquippedItem(5);
     local bodyIndex = bit.band(bodyEquip.Index, 0x00FF);
     local bodyContainer = bit.band(bodyEquip.Index, 0xFF00) / 256;
     local bodyItem = inv:GetContainerItem(bodyContainer, bodyIndex);
@@ -1010,7 +1010,10 @@ func.renderClammy = function(clammy)
 	local windowSize = (300 * Config.windowScaling[1]);
     imgui.SetNextWindowBgAlpha(0.8);
     imgui.SetNextWindowSize({ windowSize, -1, }, ImGuiCond_Always);
-	clammy = func.getCurrentEquip(clammy);
+	local player = GetPlayerEntity();
+	if (player ~= nil) then
+		clammy = func.getCurrentEquip(clammy);
+	end
 	local now = os.clock();
 	local timeBeforeReset = now - (Config.minutesBeforeAutoReset[1] * 60);
 	if (clammy.lastClammingAction < timeBeforeReset) and
