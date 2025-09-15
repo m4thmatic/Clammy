@@ -581,6 +581,7 @@ end
 func.resetSession = function(clammy)
 	clammy.startingTime = os.clock();
 	clammy.lastClammingAction = os.clock();
+	clammy.bucketStartTime = 0;
 	clammy.fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
 	clammy.filePathBroken =('log_broken_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
 	clammy.filePath = clammy.fileDir .. clammy.fileName;
