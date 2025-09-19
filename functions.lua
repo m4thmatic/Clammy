@@ -261,7 +261,8 @@ func.calcRedBucket = function(clammy)
 			if (clammy.relativeWeight < 6) or
 				(clammy.money >= modifiedLowValue and clammy.relativeWeight < 7) or
 				(clammy.money >= modifiedMidValue and clammy.relativeWeight < 11) or
-				(clammy.money >= modifiedHighValue and clammy.relativeWeight < 20) then
+				(clammy.money >= modifiedHighValue and clammy.relativeWeight < 20) or
+				(clammy.money >=  Config.highValue[1] and clammy.bucketSize == 200) then
 				clammy.bucketColor = {1.0, 0.1, 0.0, 1.0};
 				if (Config.useStopTone[1] == true) then
 					clammy.stopSound = true;
@@ -1053,6 +1054,9 @@ func.renderClammy = function(clammy)
 		end
 		if (cdTime <= 0) then
 			imgui.TextColored({ 0.5, 1.0, 0.5, 1.0 }, "  [*]");
+			if (clammy.bucketIsBroke == true) then
+				clammy.stopSound = true;
+			end
 			clammy = func.playSound(clammy);
 		else
 			imgui.TextColored({ 1.0, 1.0, 0.5, 1.0 }, "  [" .. cdTime .. "]");
