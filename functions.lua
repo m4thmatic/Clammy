@@ -842,7 +842,11 @@ end
 
 func.handleChatCommands = function(args, clammy)
     if (#args == 1) then
-		clammy.editorIsOpen[1] = true;
+		if (clammy.editorIsOpen[1] == false) then
+			clammy.editorIsOpen[1] = true;
+		else
+			clammy.editorIsOpen[1] = false;
+		end
         return clammy;
 	end
 
