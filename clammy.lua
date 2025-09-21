@@ -23,7 +23,7 @@
 addon.author   = 'MathMatic/DrifterX';
 addon.name     = 'Clammy';
 addon.desc     = 'Clamming calculator: displays bucket weight, items in bucket, & approximate value.';
-addon.version  = '1.1.0';
+addon.version  = '1.2.0';
 
 require('common');
 local const = require('constants');
@@ -139,7 +139,7 @@ ashita.events.register('text_in', 'Clammy_HandleText', function (e)
         return;
     end
 
-	clammy = func.handleTextIn(e, clammy)
+	clammy = func.handleTextIn(e, clammy);
 
 end);
 
