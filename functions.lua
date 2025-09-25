@@ -151,12 +151,10 @@ local calcRedBucket = function(clammy)
 				end
 			else
 				clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
-				clammy.stopSound = false;
 			end
 		end
 	else
 		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
-		clammy.stopSound = false;
 	end
 	return clammy;
 end
@@ -180,6 +178,7 @@ local playSound = function(clammy)
 	local waveFile = 'clam.wav';
 	if (clammy.stopSound == true) then
 		waveFile = 'stop.wav';
+		clammy.stopSound = false;
 	end
 	if (Config.tone[1] == true) and (clammy.playTone == true) then
 		ashita.misc.play_sound(addon.path:append(waveFile));
@@ -197,8 +196,41 @@ local getClammingBucket = function(clammy)
     return clammy;
 end
 
+local sessionTimeout = function(clammy)
+	if(Config.resetFullSession[1] == true) then
+		clammy.bucketsPurchased = 0;
+		clammy.bucketsReceived = 0;
+		clammy.sessionValue = 0;
+		clammy.sessionValueAH = 0;
+		clammy.sessionValueNPC = 0;
+		clammy.trueSessionValue = 0;
+		clammy.trueSessionValueNPC = 0;
+		clammy.trueSessionValueAH = 0;
+	end
+	clammy.startingTime = os.clock();
+	clammy.lastClammingAction = os.clock();
+	clammy.fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
+	clammy.filePathBroken =('log_broken_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
+	clammy.filePath = clammy.fileDir .. clammy.fileName;
+	clammy.gilPerHour = 0;
+	clammy.gilPerHourMinusBucket = 0;
+	clammy.gilPerHourAH = 0;
+	clammy.gilPerHourNPC = 0;
+	clammy.bucketAverageTime = 0;
+	clammy.bucketTimeWith = 0;
+	clammy.sessionWasReset = false;
+	return clammy;
+end
+
+local updateLastClammingAction = function(clammy)
+	clammy.lastClammingAction = os.clock();
+	if (clammy.sessionWasReset == true) then
+		clammy = sessionTimeout(clammy);
+	end
+	return clammy;
+end
+
 local handleBucket = function(clammy)
-	local now = os.clock();
 	local hasBucketKI = AshitaCore:GetMemoryManager():GetPlayer():HasKeyItem(511);
 	if (hasBucketKI == true) then
 		if (clammy.hasBucket == false) and (clammy.bucketIsBroke == false) then
@@ -216,7 +248,7 @@ local handleBucket = function(clammy)
 		if (clammy.hasBucket == true) and (clammy.bucketIsBroke == false) then
 			clammy = func.emptyBucket(clammy, true, false);
 			clammy = calculateTimePerBucket(clammy);
-			clammy.lastClammingAction = now;
+			clammy = updateLastClammingAction(clammy);
 			return clammy;
 		end
 		if (clammy.hasBucket == false) and (clammy.bucketIsBroke == true) then
@@ -515,7 +547,7 @@ end
 
 local resetSession = function(clammy)
 	clammy.startingTime = os.clock();
-	clammy.lastClammingAction = os.clock();
+	clammy = updateLastClammingAction(clammy);
 	clammy.bucketStartTime = 0;
 	clammy.fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
 	clammy.filePathBroken =('log_broken_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
@@ -531,32 +563,7 @@ local resetSession = function(clammy)
 	clammy.sessionValueAH = 0;
 	clammy.sessionValueNPC = 0;
 	clammy.bucketIsBroke = false;
-	return clammy;
-end
-
-local sessionTimeout = function(clammy)
-	if(Config.resetFullSession[1] == true) then
-		clammy.bucketsPurchased = 0;
-		clammy.bucketsReceived = 0;
-		clammy.sessionValue = 0;
-		clammy.sessionValueAH = 0;
-		clammy.sessionValueNPC = 0;
-		clammy.trueSessionValue = 0;
-		clammy.trueSessionValueNPC = 0;
-		clammy.trueSessionValueAH = 0;
-		clammy.bucketIsBroke = false;
-	end
-	clammy.startingTime = os.clock();
-	clammy.lastClammingAction = os.clock();
-	clammy.fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
-	clammy.filePathBroken =('log_broken_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
-	clammy.filePath = clammy.fileDir .. clammy.fileName;
-	clammy.gilPerHour = 0;
-	clammy.gilPerHourMinusBucket = 0;
-	clammy.gilPerHourAH = 0;
-	clammy.gilPerHourNPC = 0;
-	clammy.bucketAverageTime = 0;
-	clammy.bucketTimeWith = 0;
+	clammy.sessionWasReset = false;
 	return clammy;
 end
 
@@ -797,13 +804,15 @@ func.emptyBucket = function(clammy, turnedIn, isReset)
                         clammy.sessionValueAH = clammy.sessionValueAH + row.gil;
                     end
                 end
-                local fdata = ('%s, %s, %s, %s, %s, %s\n'):fmt(
+                local fdata = ('%s, %s, %s, %s, %s, %s, %s, %s\n'):fmt(
                     row.datetime,
                     row.item,
                     row.gil,
                     row.vendor,
                     row.moonPercent,
-                    row.bucketsPurchased
+                    row.bucketsPurchased,
+					row.bucketsReceived,
+					row.hasHQLegs
                 );
                 file:write(fdata);
             end
@@ -859,6 +868,9 @@ func.handleChatCommands = function(args, clammy)
 			
 		elseif (args[3]:any('setbucketsize')) then
 			clammy.bucketSize = tonumber(args[4]);
+
+		elseif (args[3]:any('breakbucket')) then
+			clammy.bucketIsBroke = true;
 		end
 		return clammy;
 	end
@@ -914,6 +926,11 @@ end
 
 func.handleTextIn = function(e, clammy)
 
+	local areaId = AshitaCore:GetMemoryManager():GetParty():GetMemberZone(0);
+	if (areaId ~= 4) then
+		return clammy;
+	end
+
 	local now = os.clock();
     local weightColor = {
         {diff=200, color={1.0, 1.0, 1.0, 1.0}},
@@ -933,12 +950,7 @@ func.handleTextIn = function(e, clammy)
 		clammy = calculateTimePerBucket(clammy);
 		clammy.bucketStartTime = os.clock();
 		clammy.relativeWeight = clammy.relativeWeight + 50;
-		clammy.lastClammingAction = now;
-		return clammy;
-	end
-
-	if (string.match(e.message, "All your shellfish are washed back into the sea")) then
-		clammy.bucketIsBroke = true;
+		clammy = updateLastClammingAction(clammy);
 		return clammy;
 	end
 
@@ -946,7 +958,7 @@ func.handleTextIn = function(e, clammy)
 		for idx,citem in ipairs(clammy.items) do
 			if (string.match(string.lower(e.message), string.lower(citem.item)) ~= nil) then
 				clammy = writeBucket(clammy, citem);
-				clammy.lastClammingAction = now;
+				clammy = updateLastClammingAction(clammy);
 				clammy.weight = clammy.weight + citem.weight;
 				clammy.money = clammy.money + citem.gil[1];
 				clammy.bucket[idx] = clammy.bucket[idx] + 1;
@@ -967,7 +979,10 @@ func.handleTextIn = function(e, clammy)
 				if (Config.log[1] == true) and (Config.legacyLog[1] == true) then
 					writeLogFile(citem);
 				end
-
+				if (string.match(e.message, "All your shellfish are washed back into the sea")) then
+					clammy.stopSound = true;
+					clammy.bucketIsBroke = true;
+				end
 				return clammy;
 			end
 		end
@@ -1034,6 +1049,10 @@ end
 func.renderClammy = function(clammy)
 	-- handling if player is nil zoning
 	local player = GetPlayerEntity();
+	local areaId = AshitaCore:GetMemoryManager():GetParty():GetMemberZone(0);
+	if ((areaId ~= 4) and (Config.hideInDifferentZone[1] == true)) then -- when zoning or outside Bibiki Bay
+		return clammy;
+	end
 	if (player ~= nil) then
 		clammy = getCurrentEquip(clammy);
 	end
@@ -1047,7 +1066,8 @@ func.renderClammy = function(clammy)
 	if (clammy.lastClammingAction < timeBeforeReset) and
 		(Config.autoResetLog[1] == true) and
 		(clammy.hasBucket == false) then
-		clammy = sessionTimeout(clammy);
+		clammy.lastClammingAction = now;
+		clammy.sessionWasReset = true;
 	end
 
 
@@ -1079,14 +1099,11 @@ func.renderClammy = function(clammy)
 		imgui.SameLine();
 		imgui.SetCursorPosX(imgui.GetCursorPosX() + imgui.GetColumnWidth() - imgui.GetStyle().FramePadding.x - imgui.CalcTextSize("[999]"));
 		local cdTime = math.floor(clammy.cooldown - os.clock());
-		if (Config.useStopTone[1] == true and clammy.stopSound == true) then
+		if (Config.useStopTone[1] == true and (clammy.stopSound == true or clammy.bucketIsBroke == true)) then
 			cdTime = cdTime - 9;
 		end
 		if (cdTime <= 0) then
 			imgui.TextColored({ 0.5, 1.0, 0.5, 1.0 }, "  [*]");
-			if (clammy.bucketIsBroke == true) then
-				clammy.stopSound = true;
-			end
 			clammy = playSound(clammy);
 		else
 			imgui.TextColored({ 1.0, 1.0, 0.5, 1.0 }, "  [" .. cdTime .. "]");

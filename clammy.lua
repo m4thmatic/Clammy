@@ -23,7 +23,7 @@
 addon.author   = 'MathMatic/DrifterX';
 addon.name     = 'Clammy';
 addon.desc     = 'Clamming calculator: displays bucket weight, items in bucket, & approximate value.';
-addon.version  = '1.2.0';
+addon.version  = '1.2.1';
 
 require('common');
 local const = require('constants');
@@ -75,6 +75,7 @@ local clammy = T{
 	startingTime = os.clock(),
 	bucketStartTime = 0,
 	lastClammingAction = os.clock(),
+	sessionWasReset = false,
 	bucketAverageTime = 0,
 	bucketTimeWith = 0,
 	gilPerHour = 0,
@@ -135,6 +136,7 @@ end);
 
 --------------------------------------------------------------------
 ashita.events.register('text_in', 'Clammy_HandleText', function (e)
+
     if (e.injected == true) then
         return;
     end
@@ -149,13 +151,10 @@ end);
 * desc : Event called when the Direct3D device is presenting a scene.
 --]]
 ashita.events.register('d3d_present', 'present_cb', function ()
-    local player = GetPlayerEntity();
-	local areaId = AshitaCore:GetMemoryManager():GetParty():GetMemberZone(0)
+
 	if (clammy.editorIsOpen[1] == true) then
 		clammy = func.renderEditor(clammy);
 	end
-	if (player == nil) or ((areaId ~= 4) and (Config.hideInDifferentZone[1] == true)) then -- when zoning or outside Bibiki Bay
-		return;
-	end
+
 	clammy = func.renderClammy(clammy);
 end);
