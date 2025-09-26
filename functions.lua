@@ -3,6 +3,7 @@ require('common');
 local chat = require('chat');
 local imgui = require('imgui');
 local func = T{};
+local colorConverter = imgui.ColorConvertU32ToFloat4;
 
 local openLogFile = function(clammy, notBroken)
 	if (ashita.fs.create_directory(clammy.fileDir) ~= false) then
@@ -169,6 +170,8 @@ local writeBucket = function(clammy, item)
 		bucketsPurchased = clammy.bucketsPurchased,
 		bucketsReceived = clammy.bucketsReceived,
 		hasHQLegs = clammy.hasHQLegs,
+		dayOfWeek = clammy.vanaTime.dayName,
+		currentHour = clammy.vanaTime.hourInt,
 	}
 	table.insert(clammy.trackingBucket, fdata);
 	return clammy;
@@ -346,8 +349,10 @@ local renderGeneralConfig = function(settingsTabHeight)
         imgui.ShowHelp('Toggles whether total clamming value, gil earned per hour, and buckets purchased should be shown.');
 		imgui.Checkbox('Split gil/hr and total session value by Vendor/AH', Config.splitItemsBySellType);
 		imgui.ShowHelp('Toggles whether session info should show split between items sold to vendor and items sold to AH.');
-        imgui.Checkbox('Track Moon Info', Config.trackMoonPhase);
-        imgui.ShowHelp('Toggles if moon phase should be tracked and shown.');
+        imgui.Checkbox('Show Moon Info', Config.trackMoonPhase);
+        imgui.ShowHelp('Toggles if moon phase should be shown in window.');
+		imgui.Checkbox('Show day of week', Config.showDayOfWeek);
+		imgui.ShowHelp('Show the day of the week in Vana\'diel time.');
         imgui.Checkbox('Set Weight Color Based On Value', Config.colorWeightBasedOnValue);
         imgui.ShowHelp('Toggles if the weight in the window should be based on value of the bucket.');
 		imgui.Checkbox('Show Profit', Config.subtractBucketCostFromGilEarned);
@@ -629,9 +634,10 @@ local getTimestamp = function()
     local pointer = ashita.memory.read_uint32(pVanaTime + 0x34);
     local rawTime = ashita.memory.read_uint32(pointer + 0x0C) + 92514960;
     local timestamp = {};
-    timestamp.day = math.floor(rawTime / 3456);
+	timestamp.day = math.floor(rawTime / 3456);
     timestamp.hour = math.floor(rawTime / 144) % 24;
     timestamp.minute = math.floor((rawTime % 144) / 2.4);
+	timestamp.dayOfWeekInt = (math.floor(rawTime / 3456) % 8);
     return timestamp;
 end
 
@@ -645,6 +651,28 @@ local getMoon = function(clammy)
 	end
     clammy.moonTable.moonPhase = const.moonPhase[moonIndex];
     return clammy;
+end
+
+local getVanaTime = function(clammy)
+	local timestamp = getTimestamp();
+	local daysOfWeekColorTable = T{
+		Firesday = {colorConverter(255), colorConverter(65), colorConverter(65), 1},
+		Earthsday = {colorConverter(119), colorConverter(8), colorConverter(0), 1},
+		Watersday = {colorConverter(0), colorConverter(109), colorConverter(160), 1},
+		Windsday = {colorConverter(48), colorConverter(133), colorConverter(48), 1},
+		Iceday = {colorConverter(65), colorConverter(65), colorConverter(128), 1},
+		Lightningday = {colorConverter(255), colorConverter(181), colorConverter(255), 1},
+		Lightsday = {colorConverter(227), colorConverter(227), colorConverter(227), 1},
+		Darsday = {colorConverter(15), colorConverter(15), colorConverter(16), 1},
+	}
+	for _, day in ipairs(const.daysOfWeek) do
+		if timestamp.dayOfWeekInt == day.dayInt then
+			clammy.vanaTime.dayName = day.Name;
+			clammy.vanaTime.dayOfWeekColor = daysOfWeekColorTable[day.Name];
+		end
+	end
+	clammy.vanaTime.hourInt = timestamp.hour;
+	return clammy;
 end
 
 local formatTimestamp = function(timer)
@@ -804,7 +832,11 @@ func.emptyBucket = function(clammy, turnedIn, isReset)
                         clammy.sessionValueAH = clammy.sessionValueAH + row.gil;
                     end
                 end
-                local fdata = ('%s, %s, %s, %s, %s, %s, %s, %s\n'):fmt(
+				-- CSV columns:
+				-- DateTime (String), Item Name(String), Configured Item Sell price when placed in bucket(Int), Whether or not the item is sold to a vendor(Bool),
+				-- Percentage of moon phase (Signed Int), Number of buckets paid for(Int), Number of buckets received including transfer buckets (Int), 
+				-- Whether or not HQ clamming legs are equipped (Bool), Current vana'diel day of the week(String), Current vana'diel hour (Int) 
+                local fdata = ('%s, %s, %s, %s, %s, %s, %s, %s, %s, %s\n'):fmt(
                     row.datetime,
                     row.item,
                     row.gil,
@@ -812,7 +844,9 @@ func.emptyBucket = function(clammy, turnedIn, isReset)
                     row.moonPercent,
                     row.bucketsPurchased,
 					row.bucketsReceived,
-					row.hasHQLegs
+					row.hasHQLegs,
+					row.dayOfWeek,
+					row.currentHour
                 );
                 file:write(fdata);
             end
@@ -931,7 +965,6 @@ func.handleTextIn = function(e, clammy)
 		return clammy;
 	end
 
-	local now = os.clock();
     local weightColor = {
         {diff=200, color={1.0, 1.0, 1.0, 1.0}},
         {diff=35, color={1.0, 1.0, 0.8, 1.0}},
@@ -994,8 +1027,8 @@ func.renderEditor = function(clammy)
     if (not clammy.editorIsOpen[1]) then
         return clammy;
     end
-	local settingsTabHeight = 445;
-	local settingsWindowHeight = 560;
+	local settingsTabHeight = 470;
+	local settingsWindowHeight = 585;
 	if (Config.log[1] == true) then
 		settingsTabHeight = settingsTabHeight + 25;
 		settingsWindowHeight = settingsWindowHeight + 25;
@@ -1059,6 +1092,8 @@ func.renderClammy = function(clammy)
 
 	-- 
 	clammy = handleBucket(clammy);
+	clammy = getVanaTime(clammy);
+	clammy = getMoon(clammy);
 
 	-- Handling auto reset of session
 	local now = os.clock();
@@ -1084,9 +1119,6 @@ func.renderClammy = function(clammy)
 			imgui.TextColored({0.1, 0.1, 0.1, 1.0}, "Bucket")
 		else
 			imgui.TextColored({0.9, 0.9, 0.0, 1.0}, "Bucket")
-		end
-		if (Config.trackMoonPhase[1] == true) then
-			clammy = getMoon(clammy);
 		end
 		clammy = calcRedBucket(clammy);
 		imgui.SameLine()
@@ -1185,7 +1217,6 @@ func.renderClammy = function(clammy)
 				imgui.Text("Buckets : "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets  (Gil spent):    "));
 				imgui.Text("" .. clammy.bucketsPurchased);
 			end
-			local now = os.clock();
 			imgui.Text("Session length:"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets (Bought)(Spent): "));
 			imgui.Text("".. formatTimestamp(now - clammy.startingTime))
 			if Config.showAverageTimePerBucket[1] == true then
@@ -1197,6 +1228,11 @@ func.renderClammy = function(clammy)
 			imgui.Separator();
 			imgui.Text("Current moon phase is: " .. clammy.moonTable.moonPhase);
 			imgui.Text("Current moon phase percentage is: " .. clammy.moonTable.moonPercent .. "%");
+		end
+		if (Config.showDayOfWeek[1] == true) then
+			imgui.Separator();
+			imgui.Text("The current day is: "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("The current day is:  "))
+			imgui.TextColored(clammy.vanaTime.dayOfWeekColor, "".. clammy.vanaTime.dayName);
 		end
 
 		if (Config.checkEquippedItem[1] == true) then

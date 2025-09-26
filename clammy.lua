@@ -23,7 +23,7 @@
 addon.author   = 'MathMatic/DrifterX';
 addon.name     = 'Clammy';
 addon.desc     = 'Clamming calculator: displays bucket weight, items in bucket, & approximate value.';
-addon.version  = '1.2.1';
+addon.version  = '1.2.2';
 
 require('common');
 local const = require('constants');
@@ -56,6 +56,7 @@ local defaultConfig = T{
 	alwaysStopAtThirdBucket = T{ true, },
 	checkEquippedItem = T{ true, },
 	windowScaling = T{ 1.0, },
+	showDayOfWeek = T{ true, },
 }
 Config = Settings.load(defaultConfig);
 
@@ -95,6 +96,13 @@ local clammy = T{
 	moonTable = T{
 		moonPhase = "",
 		moonPercent = 0,
+	},
+	vanaTime = T{
+		dayName = "",
+		dayOfWeekColor = T{
+			0, 0, 0, 0,
+		},
+		hourInt = 0,
 	},
 	bucketColor = {1.0,1.0,1.0,1.0},
 	stopSound = false,
