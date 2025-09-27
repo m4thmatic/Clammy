@@ -656,20 +656,24 @@ end
 local getVanaTime = function(clammy)
 	local timestamp = getTimestamp();
 	local daysOfWeekColorTable = T{
-		Firesday = {colorConverter(255), colorConverter(65), colorConverter(65), 1},
-		Earthsday = {colorConverter(119), colorConverter(8), colorConverter(0), 1},
+		Firesday = {colorConverter(255), colorConverter(40), colorConverter(40), 1},
+		Earthsday = {colorConverter(200), colorConverter(200), colorConverter(0), 1},
 		Watersday = {colorConverter(0), colorConverter(109), colorConverter(160), 1},
-		Windsday = {colorConverter(48), colorConverter(133), colorConverter(48), 1},
-		Iceday = {colorConverter(65), colorConverter(65), colorConverter(128), 1},
+		Windsday = {colorConverter(48), colorConverter(200), colorConverter(48), 1},
+		Iceday = {colorConverter(150), colorConverter(150), colorConverter(240), 1},
 		Lightningday = {colorConverter(255), colorConverter(181), colorConverter(255), 1},
 		Lightsday = {colorConverter(227), colorConverter(227), colorConverter(227), 1},
-		Darsday = {colorConverter(15), colorConverter(15), colorConverter(16), 1},
+		Darksday = {colorConverter(15), colorConverter(15), colorConverter(16), 1},
 	}
 	for _, day in ipairs(const.daysOfWeek) do
 		if timestamp.dayOfWeekInt == day.dayInt then
 			clammy.vanaTime.dayName = day.Name;
 			clammy.vanaTime.dayOfWeekColor = daysOfWeekColorTable[day.Name];
 		end
+	end
+	if clammy.vanaTime.dayOfWeekColor == nil then
+		clammy.vanaTime.dayName = 'Unknown day!?';
+		clammy.vanaTime.dayOfWeekColor = {colorConverter(255), colorConverter(255), colorConverter(255), 1};
 	end
 	clammy.vanaTime.hourInt = timestamp.hour;
 	return clammy;
