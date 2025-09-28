@@ -130,6 +130,7 @@ local calcRedBucket = function(clammy)
 		(clammy.weight > 130) then
 		if (Config.alwaysStopAtThirdBucket[1] == true) then
 			clammy.bucketColor = {1.0, 0.1, 0.0, 1.0};
+			clammy.bucketShouldBeTurnedIn = true;
 			if (Config.useStopTone[1] == true) then
 				clammy.stopSound = true;
 			end
@@ -147,15 +148,18 @@ local calcRedBucket = function(clammy)
 				(clammy.money >= modifiedHighValue and clammy.relativeWeight < 20) or
 				(clammy.money >=  Config.highValue[1] and clammy.bucketSize == 200) then
 				clammy.bucketColor = {1.0, 0.1, 0.0, 1.0};
+				clammy.bucketShouldBeTurnedIn = true;
 				if (Config.useStopTone[1] == true) then
 					clammy.stopSound = true;
 				end
 			else
 				clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
+				clammy.bucketShouldBeTurnedIn = false;
 			end
 		end
 	else
 		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
+		clammy.bucketShouldBeTurnedIn = false;
 	end
 	return clammy;
 end
@@ -193,6 +197,7 @@ end
 local getClammingBucket = function(clammy)
 	clammy.bucketsPurchased = clammy.bucketsPurchased + 1;
 	clammy.bucketsReceived = clammy.bucketsReceived + 1;
+	clammy.percentRemaining = 1;
 	clammy.hasBucket = true;
 	clammy.bucketIsBroke = false;
 	clammy.bucketStartTime = os.clock();
@@ -361,6 +366,8 @@ local renderGeneralConfig = function(settingsTabHeight)
 		imgui.ShowHelp('Calculate and show average time per bucket received.');
 		imgui.Checkbox('Show % chance bucket break', Config.showPercentChanceToBreak);
 		imgui.ShowHelp('Calculates the chance that the next clamming attempt will break your bucket.');
+		imgui.Checkbox('Show Bucket Health', Config.showClammyHealth);
+		imgui.ShowHelp('Show bar representing how much weight remains before your bucket breaks');
 		imgui.Checkbox('Show equipment status', Config.checkEquippedItem);
 		imgui.ShowHelp('Shows whether you are wearing the HQ clamming set.');
 		imgui.Checkbox('No clammy outside the bay', Config.hideInDifferentZone);
@@ -817,6 +824,7 @@ func.emptyBucket = function(clammy, turnedIn, isReset)
     clammy.bucketSize = 50;
 	clammy.weight = 0;
 	clammy.relativeWeight = 50;
+	clammy.percentRemaining = 0;
 	clammy.money = 0;
 	clammy.hasBucket = false;
 	clammy.showItemSeparator = false;
@@ -964,6 +972,7 @@ end
 
 func.handleTextIn = function(e, clammy)
 
+	local hasBucketKI = AshitaCore:GetMemoryManager():GetPlayer():HasKeyItem(511);
 	local areaId = AshitaCore:GetMemoryManager():GetParty():GetMemberZone(0);
 	if (areaId ~= 4) then
 		return clammy;
@@ -982,8 +991,10 @@ func.handleTextIn = function(e, clammy)
 	--Your clamming capacity has increased to XXX ponzes!
 	if (string.match(e.message, "Your clamming capacity has increased to")) then
 		clammy.bucketSize = clammy.bucketSize + 50;
+		clammy.percentRemaining = 1;
 		clammy.bucketsReceived = clammy.bucketsReceived + 1;
 		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
+		clammy.bucketShouldBeTurnedIn = false;
 		clammy = calculateTimePerBucket(clammy);
 		clammy.bucketStartTime = os.clock();
 		clammy.relativeWeight = clammy.relativeWeight + 50;
@@ -991,7 +1002,7 @@ func.handleTextIn = function(e, clammy)
 		return clammy;
 	end
 
-	if (string.match(e.message, "You find a")) then
+	if (string.match(e.message, "You find a") and (hasBucketKI == true)) then
 		for idx,citem in ipairs(clammy.items) do
 			if (string.match(string.lower(e.message), string.lower(citem.item)) ~= nil) then
 				clammy = writeBucket(clammy, citem);
@@ -1007,9 +1018,11 @@ func.handleTextIn = function(e, clammy)
 							clammy.bucketColor = item.color;
 						end
 					end
-				else
-					clammy.relativeWeight = clammy.bucketSize - clammy.weight;
 				end
+				clammy.relativeWeight = clammy.bucketSize - clammy.weight;
+				local bucketScalar = clammy.bucketSize / 50;
+				local relativeBucketSize = clammy.bucketSize / bucketScalar;
+				clammy.percentRemaining = (clammy.relativeWeight % 50) / relativeBucketSize;
 				clammy.hasBucket = true;
 				clammy.playTone = true;
 
@@ -1031,8 +1044,8 @@ func.renderEditor = function(clammy)
     if (not clammy.editorIsOpen[1]) then
         return clammy;
     end
-	local settingsTabHeight = 470;
-	local settingsWindowHeight = 585;
+	local settingsTabHeight = 495;
+	local settingsWindowHeight = 610;
 	if (Config.log[1] == true) then
 		settingsTabHeight = settingsTabHeight + 25;
 		settingsWindowHeight = settingsWindowHeight + 25;
@@ -1098,6 +1111,7 @@ func.renderClammy = function(clammy)
 	clammy = handleBucket(clammy);
 	clammy = getVanaTime(clammy);
 	clammy = getMoon(clammy);
+	local bucketBreakChance = calculateChanceOfBreak(clammy, (clammy.bucketSize - clammy.weight));
 
 	-- Handling auto reset of session
 	local now = os.clock();
@@ -1144,8 +1158,18 @@ func.renderClammy = function(clammy)
 		else
 			imgui.TextColored({ 1.0, 1.0, 0.5, 1.0 }, "  [" .. cdTime .. "]");
 		end
+		if (Config.showClammyHealth[1] == true) then
+			local barcolor = T{0, 0.75, 0, 1};
+			if (clammy.bucketShouldBeTurnedIn == true) then
+				barcolor = {1, 0.1, 0, 1};
+			elseif (bucketBreakChance.percentWeight > 0) then
+				barcolor = bucketBreakChance.color;
+			end
+			imgui.PushStyleColor(ImGuiCol_PlotHistogram, barcolor);
+			imgui.ProgressBar(clammy.percentRemaining, {-1.0, 0}, "Bucket Health ".. (clammy.percentRemaining * 100).. "%");
+			imgui.PopStyleColor(1);
+		end
 		if (Config.showPercentChanceToBreak[1] == true) then
-			local bucketBreakChance = calculateChanceOfBreak(clammy, (clammy.bucketSize - clammy.weight));
 			imgui.Text("Percent chance to break: "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:  "));
 			imgui.SetWindowFontScale(enlargedFontSize); imgui.SetCursorPosY(imgui.GetCursorPosY() - (2 * Config.windowScaling[1]));
 			imgui.TextColored(bucketBreakChance.color, formatChanceBreak(bucketBreakChance.percentWeight)); imgui.SameLine();

@@ -23,7 +23,7 @@
 addon.author   = 'MathMatic/DrifterX';
 addon.name     = 'Clammy';
 addon.desc     = 'Clamming calculator: displays bucket weight, items in bucket, & approximate value.';
-addon.version  = '1.2.3';
+addon.version  = '1.2.4';
 
 require('common');
 local const = require('constants');
@@ -57,12 +57,14 @@ local defaultConfig = T{
 	checkEquippedItem = T{ true, },
 	windowScaling = T{ 1.0, },
 	showDayOfWeek = T{ true, },
+	showClammyHealth = T{ true, },
 }
 Config = Settings.load(defaultConfig);
 
 local clammy = T{
 	bucketSize = 50,
 	relativeWeight = 50,
+	percentRemaining = 0,
 	weight = 0,
 	money  = 0,
 	sessionValue = 0,
@@ -88,6 +90,7 @@ local clammy = T{
 	trueSessionValueAH = 0,
 	hasBucket = false,
 	bucketIsBroke = false,
+	bucketShouldBeTurnedIn = false,
 	editorIsOpen = T{ false, },
 	hasHQLegs = false,
 	hasHQBody = false,
