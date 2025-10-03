@@ -58,6 +58,7 @@ local defaultConfig = T{
 	windowScaling = T{ 1.0, },
 	showDayOfWeek = T{ true, },
 	showClammyHealth = T{ true, },
+	showClammingAttempts = T{ true, },
 }
 Config = Settings.load(defaultConfig);
 
@@ -76,6 +77,7 @@ local clammy = T{
 	trackingBucket = {},
 	cooldown = 0,
 	startingTime = os.clock(),
+	clammingAttempts = 0,
 	bucketStartTime = 0,
 	lastClammingAction = os.clock(),
 	sessionWasReset = false,
@@ -85,6 +87,7 @@ local clammy = T{
 	gilPerHourNPC = 0,
 	gilPerHourAH = 0,
 	gilPerHourMinusBucket = 0,
+	clammingAttemptsPerHour = 0,
 	trueSessionValue = 0,
 	trueSessionValueNPC = 0,
 	trueSessionValueAH = 0,

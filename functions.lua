@@ -222,6 +222,8 @@ local sessionTimeout = function(clammy)
 	clammy.filePath = clammy.fileDir .. clammy.fileName;
 	clammy.gilPerHour = 0;
 	clammy.gilPerHourMinusBucket = 0;
+	clammy.clammingAttemptsPerHour = 0;
+	clammy.clammingAttempts = 0;
 	clammy.gilPerHourAH = 0;
 	clammy.gilPerHourNPC = 0;
 	clammy.bucketAverageTime = 0;
@@ -364,6 +366,8 @@ local renderGeneralConfig = function(settingsTabHeight)
 		imgui.ShowHelp('Subtract cost of buckets from total clamming value amount.');
 		imgui.Checkbox('Show Time per Bucket', Config.showAverageTimePerBucket);
 		imgui.ShowHelp('Calculate and show average time per bucket received.');
+		imgui.Checkbox('Show # of clamming tries', Config.showClammingAttempts);
+		imgui.ShowHelp('Show how many times you\'ve dug and digs per minute.');
 		imgui.Checkbox('Show % chance bucket break', Config.showPercentChanceToBreak);
 		imgui.ShowHelp('Calculates the chance that the next clamming attempt will break your bucket.');
 		imgui.Checkbox('Show Bucket Health', Config.showClammyHealth);
@@ -569,6 +573,8 @@ local resetSession = function(clammy)
 	clammy.gilPerHourMinusBucket = 0;
 	clammy.gilPerHourAH = 0;
 	clammy.gilPerHourNPC = 0;
+	clammy.clammingAttemptsPerHour = 0;
+	clammy.clammingAttempts = 0;
 	clammy.bucketsPurchased = 0;
 	clammy.bucketsReceived = 0;
 	clammy.sessionValue = 0;
@@ -1011,7 +1017,7 @@ func.handleTextIn = function(e, clammy)
 				clammy.money = clammy.money + citem.gil[1];
 				clammy.bucket[idx] = clammy.bucket[idx] + 1;
 				clammy.cooldown =  os.clock() + 10.5;
-
+				clammy.clammingAttempts = clammy.clammingAttempts + 1;
 				if Config.colorWeightBasedOnValue[1] == false then
 					for _, item in ipairs(weightColor) do
 						if ((clammy.bucketSize - clammy.weight) < item.diff) then
@@ -1044,8 +1050,8 @@ func.renderEditor = function(clammy)
     if (not clammy.editorIsOpen[1]) then
         return clammy;
     end
-	local settingsTabHeight = 495;
-	local settingsWindowHeight = 610;
+	local settingsTabHeight = 520;
+	local settingsWindowHeight = 645;
 	if (Config.log[1] == true) then
 		settingsTabHeight = settingsTabHeight + 25;
 		settingsWindowHeight = settingsWindowHeight + 25;
@@ -1122,7 +1128,7 @@ func.renderClammy = function(clammy)
 		clammy.lastClammingAction = now;
 		clammy.sessionWasReset = true;
 	end
-
+		clammy.clammingAttemptsPerHour = (clammy.clammingAttempts / ((now - clammy.startingTime) / 60));
 
 	local windowSize = (300 * Config.windowScaling[1]);
     imgui.SetNextWindowBgAlpha(0.8);
@@ -1158,6 +1164,9 @@ func.renderClammy = function(clammy)
 		else
 			imgui.TextColored({ 1.0, 1.0, 0.5, 1.0 }, "  [" .. cdTime .. "]");
 		end
+		if (Config.showValue[1] == true) then
+			imgui.Text("Estimated Value: " .. formatInt(clammy.money));
+		end
 		if (Config.showClammyHealth[1] == true) then
 			local barcolor = T{0, 0.75, 0, 1};
 			if (clammy.bucketShouldBeTurnedIn == true) then
@@ -1184,9 +1193,6 @@ func.renderClammy = function(clammy)
 				imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:    " .. bucketBreakChance.percentWeight));
 			end
 			imgui.Text("%");
-		end
-		if (Config.showValue[1] == true) then
-			imgui.Text("Estimated Value: " .. formatInt(clammy.money));
 		end
 		local textColor = {0.0, 0.75, 0.60, 1};
 		if (Config.showSessionInfo[1] == true) then
@@ -1251,6 +1257,9 @@ func.renderClammy = function(clammy)
 				imgui.Text('Avg time/bucket:'); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets (Bought)(Spent): "));
 				imgui.Text('' .. formatTimestamp(clammy.bucketAverageTime));
 			end
+		end
+		if (Config.showClammingAttempts[1] == true) then
+			imgui.Text('Clamming digs:          '.. clammy.clammingAttempts .. " (" .. math.round(clammy.clammingAttemptsPerHour) .. " dpm)")
 		end
 		if (Config.trackMoonPhase[1] == true) then
 			imgui.Separator();
