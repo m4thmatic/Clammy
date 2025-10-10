@@ -1259,7 +1259,7 @@ func.renderClammy = function(clammy)
 			end
 		end
 		if (Config.showClammingAttempts[1] == true) then
-			imgui.Text('Clamming digs:          '.. clammy.clammingAttempts .. " (" .. math.round(clammy.clammingAttemptsPerHour) .. " dpm)")
+			imgui.Text('Clamming digs:          '.. clammy.clammingAttempts .. " (" .. math.round(clammy.clammingAttemptsPerHour, 1) .. " dpm)")
 		end
 		if (Config.trackMoonPhase[1] == true) then
 			imgui.Separator();
