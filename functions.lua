@@ -9,8 +9,33 @@ local openLogFile = function(clammy, notBroken)
 	if (ashita.fs.create_directory(clammy.fileDir) ~= false) then
         local file;
 		if notBroken == false then
+			local fileExists = io.open(clammy.filePathBroken, 'r');
+			if (fileExists == nil) then
+				file = io.open(clammy.filePathBroken, 'a');
+				-- DateTime (String), Item Name(String), Configured Item Sell price when placed in bucket(Int), Whether or not the item is sold to a vendor(Bool),
+				-- Percentage of moon phase (Signed Int), Number of buckets paid for(Int), Number of buckets received including transfer buckets (Int), 
+				-- Whether or not HQ clamming legs are equipped (Bool), Current vana'diel day of the week(String), Current vana'diel hour (Int)
+				local headers = 'Date, Item, Gil, Vendor, MoonPhase, BucketsPurchased, BucketsReceived, WearingHQGear, VanaDay, VanaHour\n'
+				if (file ~= nil) then
+					file:write(headers);
+					io.close(file);
+				end
+			else
+				io.close(fileExists);
+			end
 			file = io.open(clammy.filePathBroken, 'a');
 		else
+			local fileExists = io.open(clammy.filePath, 'r');
+			if (fileExists == nil) then
+				file = io.open(clammy.filePath, 'a');
+				local headers = 'Date, Item, Gil, Vendor, MoonPhase, BucketsPurchased, BucketsReceived, WearingHQGear, VanaDay, VanaHour\n'
+				if (file ~= nil) then
+					file:write(headers);
+					io.close(file);
+				end
+			else
+				io.close(fileExists);
+			end
 			file = io.open(clammy.filePath, 'a');
 		end
 
