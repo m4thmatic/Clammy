@@ -267,6 +267,17 @@ local constants = T{
         { name = 'MITHRA_SHORTS_P1',                id = 15420 },
         { name = 'GALKA_TRUNKS_P1',                 id = 15421 },
     },
+
+    daysOfWeek = {
+        { dayInt = 0, Name = 'Firesday' },
+        { dayInt = 1, Name = 'Earthsday' },
+        { dayInt = 2, Name = 'Watersday' },
+        { dayInt = 3, Name = 'Windsday' },
+        { dayInt = 4, Name = 'Iceday' },
+        { dayInt = 5, Name = 'Lightningday' },
+        { dayInt = 6, Name = 'Lightsday' },
+        { dayInt = 7, Name = 'Darksday' },
+    }
 }
 
 return constants;

@@ -23,7 +23,7 @@
 addon.author   = 'MathMatic/DrifterX';
 addon.name     = 'Clammy';
 addon.desc     = 'Clamming calculator: displays bucket weight, items in bucket, & approximate value.';
-addon.version  = '1.1.0';
+addon.version  = '1.2.0';
 
 require('common');
 local const = require('constants');
@@ -56,12 +56,16 @@ local defaultConfig = T{
 	alwaysStopAtThirdBucket = T{ true, },
 	checkEquippedItem = T{ true, },
 	windowScaling = T{ 1.0, },
+	showDayOfWeek = T{ true, },
+	showClammyHealth = T{ true, },
+	showClammingAttempts = T{ true, },
 }
 Config = Settings.load(defaultConfig);
 
 local clammy = T{
 	bucketSize = 50,
 	relativeWeight = 50,
+	percentRemaining = 0,
 	weight = 0,
 	money  = 0,
 	sessionValue = 0,
@@ -73,19 +77,23 @@ local clammy = T{
 	trackingBucket = {},
 	cooldown = 0,
 	startingTime = os.clock(),
+	clammingAttempts = 0,
 	bucketStartTime = 0,
 	lastClammingAction = os.clock(),
+	sessionWasReset = false,
 	bucketAverageTime = 0,
 	bucketTimeWith = 0,
 	gilPerHour = 0,
 	gilPerHourNPC = 0,
 	gilPerHourAH = 0,
 	gilPerHourMinusBucket = 0,
+	clammingAttemptsPerHour = 0,
 	trueSessionValue = 0,
 	trueSessionValueNPC = 0,
 	trueSessionValueAH = 0,
 	hasBucket = false,
 	bucketIsBroke = false,
+	bucketShouldBeTurnedIn = false,
 	editorIsOpen = T{ false, },
 	hasHQLegs = false,
 	hasHQBody = false,
@@ -94,6 +102,13 @@ local clammy = T{
 	moonTable = T{
 		moonPhase = "",
 		moonPercent = 0,
+	},
+	vanaTime = T{
+		dayName = "",
+		dayOfWeekColor = T{
+			0, 0, 0, 0,
+		},
+		hourInt = 0,
 	},
 	bucketColor = {1.0,1.0,1.0,1.0},
 	stopSound = false,
@@ -135,11 +150,12 @@ end);
 
 --------------------------------------------------------------------
 ashita.events.register('text_in', 'Clammy_HandleText', function (e)
+
     if (e.injected == true) then
         return;
     end
 
-	clammy = func.handleTextIn(e, clammy)
+	clammy = func.handleTextIn(e, clammy);
 
 end);
 
@@ -149,13 +165,10 @@ end);
 * desc : Event called when the Direct3D device is presenting a scene.
 --]]
 ashita.events.register('d3d_present', 'present_cb', function ()
-    local player = GetPlayerEntity();
-	local areaId = AshitaCore:GetMemoryManager():GetParty():GetMemberZone(0)
+
 	if (clammy.editorIsOpen[1] == true) then
 		clammy = func.renderEditor(clammy);
 	end
-	if (player == nil) or ((areaId ~= 4) and (Config.hideInDifferentZone[1] == true)) then -- when zoning or outside Bibiki Bay
-		return;
-	end
+
 	clammy = func.renderClammy(clammy);
 end);

@@ -3,85 +3,68 @@ require('common');
 local chat = require('chat');
 local imgui = require('imgui');
 local func = T{};
+local colorConverter = imgui.ColorConvertU32ToFloat4;
 
-func.emptyBucket = function(clammy, turnedIn, isReset)
-    clammy.bucketSize = 50;
-	clammy.weight = 0;
-	clammy.money = 0;
-	clammy.hasBucket = false
-	clammy.showItemSeparator = false;
+local openLogFile = function(clammy, notBroken)
+	if (ashita.fs.create_directory(clammy.fileDir) ~= false) then
+        local file;
+		if notBroken == false then
+			local fileExists = io.open(clammy.filePathBroken, 'r');
+			if (fileExists == nil) then
+				file = io.open(clammy.filePathBroken, 'a');
+				-- DateTime (String), Item Name(String), Configured Item Sell price when placed in bucket(Int), Whether or not the item is sold to a vendor(Bool),
+				-- Percentage of moon phase (Signed Int), Number of buckets paid for(Int), Number of buckets received including transfer buckets (Int), 
+				-- Whether or not HQ clamming legs are equipped (Bool), Current vana'diel day of the week(String), Current vana'diel hour (Int)
+				local headers = 'Date, Item, Gil, Vendor, MoonPhase, BucketsPurchased, BucketsReceived, WearingHQGear, VanaDay, VanaHour\n'
+				if (file ~= nil) then
+					file:write(headers);
+					io.close(file);
+				end
+			else
+				io.close(fileExists);
+			end
+			file = io.open(clammy.filePathBroken, 'a');
+		else
+			local fileExists = io.open(clammy.filePath, 'r');
+			if (fileExists == nil) then
+				file = io.open(clammy.filePath, 'a');
+				local headers = 'Date, Item, Gil, Vendor, MoonPhase, BucketsPurchased, BucketsReceived, WearingHQGear, VanaDay, VanaHour\n'
+				if (file ~= nil) then
+					file:write(headers);
+					io.close(file);
+				end
+			else
+				io.close(fileExists);
+			end
+			file = io.open(clammy.filePath, 'a');
+		end
 
-	for idx,citem in ipairs(clammy.items) do
-		clammy.bucket[idx] = 0;
+		if (file == nil) then
+			print("Clammy: Could not open log file.")
+		else
+			return file;
+		end
 	end
-	if (isReset == false) then
-        if (Config.log[1] == true) and (Config.legacyLog[1] == false) then
-            local file = func.openLogFile(clammy, turnedIn);
-            for _,row in ipairs(clammy.trackingBucket) do
-                if turnedIn == true then
-                    clammy.sessionValue = clammy.sessionValue + row.gil;
-                    if(row.vendor == true) then
-                        clammy.sessionValueNPC = clammy.sessionValueNPC + row.gil;
-                    else
-                        clammy.sessionValueAH = clammy.sessionValueAH + row.gil;
-                    end
-                end
-                local fdata = ('%s, %s, %s, %s, %s, %s\n'):fmt(
-                    row.datetime,
-                    row.item,
-                    row.gil,
-                    row.vendor,
-                    row.moonPercent,
-                    row.bucketsPurchased
-                );
-                file:write(fdata);
-            end
-            func.closeLogFile(file);
-        end
-    end
-
-	clammy.trackingBucket = {};
-	if Config.subtractBucketCostFromGilEarned[1] == true then
-		clammy.trueSessionValue = clammy.sessionValue - (clammy.bucketsPurchased * 500);
-	else
-		clammy.trueSessionValue = clammy.sessionValue;
-	end
-	clammy.trueSessionValueNPC = clammy.sessionValueNPC;
-	clammy.trueSessionValueAH = clammy.sessionValueAH;
-	clammy = func.updateGilPerHour(clammy);
-	if isReset == true then
-		clammy.bucketAverageTime = 0;
-	end
-	return clammy;
 end
 
-func.writeBucket = function(clammy, item)
-	local fdata = {
-		datetime = os.date('%Y-%m-%d %H:%M:%S'),
-		item = item.item,
-		gil = item.gil[1],
-		vendor = item.vendor[1],
-		moonPercent = clammy.moonTable.moonPercent,
-		bucketsPurchased = clammy.bucketsPurchased,
-		hasHQLegs = clammy.hasHQLegs,
-	}
-	table.insert(clammy.trackingBucket, fdata);
-	return clammy;
+local closeLogFile = function(file)
+	if (file ~= nil) then
+		io.close(file)
+	end
 end
 
-func.playSound = function(clammy)
-	local waveFile = 'clam.wav';
-	if (clammy.stopSound == true) then
-		waveFile = 'stop.wav';
+local writeLogFile = function(clammy, item)
+	local file = openLogFile(clammy, true);
+
+	if (file ~= nil) then
+		local fdata = ('%s, %s %s\n'):fmt(os.date('%Y-%m-%d %H:%M:%S'), item.item, item.gil[1]);
+		file:write(fdata);
 	end
-	if (Config.tone[1] == true) and (clammy.playTone == true) then
-		ashita.misc.play_sound(addon.path:append(waveFile));
-		clammy.playTone = false;
-	end
-    return clammy;
+
+	closeLogFile(file);
 end
 
-func.updateGilPerHour = function(clammy)
+local updateGilPerHour = function(clammy)
 	local now = os.clock();
 	if ((now - clammy.startingTime) > 0) then
 		clammy.gilPerHourMinusBucket = math.floor(clammy.trueSessionValue / ((now - clammy.startingTime) / 3600));
@@ -92,7 +75,63 @@ func.updateGilPerHour = function(clammy)
 	return clammy;
 end
 
-func.calculateTimePerBucket = function(clammy)
+local calcRarityDifference = function()
+	local rarityHQ = T{
+		threeWeightPercent = 0,
+		sixWeightPercent = 0,
+		sevenWeightPercent = 0,
+		elevenWeightPercent = 0,
+		twentyWeightPercent = 0,
+	};
+	local rarityNoHQ = T{
+		threeWeightPercent = 0,
+		sixWeightPercent = 0,
+		sevenWeightPercent = 0,
+		elevenWeightPercent = 0,
+		twentyWeightPercent = 0,
+	};
+
+	local tableToUse = Config.items;
+	for _, item in ipairs(tableToUse) do
+		if (item.weight == 20) then
+			rarityHQ.twentyWeightPercent = rarityHQ.twentyWeightPercent + item.rarity[1];
+		elseif (item.weight == 11) then
+			rarityHQ.elevenWeightPercent = rarityHQ.elevenWeightPercent + item.rarity[1];
+		elseif (item.weight == 7) then
+			rarityHQ.sevenWeightPercent = rarityHQ.sevenWeightPercent + item.rarity[1];
+		elseif (item.weight == 6) then
+			rarityHQ.sixWeightPercent = rarityHQ.sixWeightPercent + item.rarity[1];
+		elseif (item.weight == 3) then
+			rarityHQ.threeWeightPercent = rarityHQ.threeWeightPercent + item.rarity[1];
+		end
+	end
+
+	tableToUse = const.clammingRarityNoHQGear;
+	for _, item in ipairs(tableToUse) do
+		if (item.weight == 20) then
+			rarityNoHQ.twentyWeightPercent = rarityNoHQ.twentyWeightPercent + item.rarity[1];
+		elseif (item.weight == 11) then
+			rarityNoHQ.elevenWeightPercent = rarityNoHQ.elevenWeightPercent + item.rarity[1];
+		elseif (item.weight == 7) then
+			rarityNoHQ.sevenWeightPercent = rarityNoHQ.sevenWeightPercent + item.rarity[1];
+		elseif (item.weight == 6) then
+			rarityNoHQ.sixWeightPercent = rarityNoHQ.sixWeightPercent + item.rarity[1];
+		elseif (item.weight == 3) then
+			rarityNoHQ.threeWeightPercent = rarityNoHQ.threeWeightPercent + item.rarity[1];
+		end
+	end
+
+	local rarityDifference = T{
+		threeWeightPercent = rarityNoHQ.threeWeightPercent - rarityHQ.threeWeightPercent,
+		sixWeightPercent = rarityNoHQ.sixWeightPercent - rarityHQ.sixWeightPercent,
+		sevenWeightPercent = rarityNoHQ.sevenWeightPercent - rarityHQ.sevenWeightPercent,
+		elevenWeightPercent = rarityNoHQ.elevenWeightPercent - rarityHQ.elevenWeightPercent,
+		twentyWeightPercent = rarityNoHQ.twentyWeightPercent - rarityHQ.twentyWeightPercent,
+	};
+	return rarityDifference;
+end
+
+local calculateTimePerBucket = function(clammy)
 	local now = os.clock();
 	local thisBucketTime = now - clammy.bucketStartTime;
 	clammy.bucketTimeWith = clammy.bucketTimeWith + thisBucketTime;
@@ -104,7 +143,159 @@ func.calculateTimePerBucket = function(clammy)
 	return clammy
 end
 
-func.calculateChanceOfBreak = function(clammy, remainingWeight)
+local calcRedBucket = function(clammy)
+	local rarityModifiers = 1;
+	if (clammy.hasHQLegs == false) then
+		rarityModifiers = calcRarityDifference();
+	end
+	if  (clammy.relativeWeight < 6) or
+		(clammy.money >= Config.lowValue[1] and clammy.relativeWeight < 7) or
+		(clammy.money >= Config.midValue[1] and clammy.relativeWeight < 11) or
+		(clammy.money >= Config.highValue[1] and clammy.relativeWeight < 20) or
+		(clammy.weight > 130) then
+		if (Config.alwaysStopAtThirdBucket[1] == true) then
+			clammy.bucketColor = {1.0, 0.1, 0.0, 1.0};
+			clammy.bucketShouldBeTurnedIn = true;
+			if (Config.useStopTone[1] == true) then
+				clammy.stopSound = true;
+			end
+		elseif (Config.alwaysStopAtThirdBucket[1] == false) then
+			local clammingIncidentModifier = 0.9;
+			if (clammy.hasHQBody == true) then
+				clammingIncidentModifier = 0.95;
+			end
+			local modifiedLowValue = math.floor(Config.lowValue[1] * clammingIncidentModifier);
+			local modifiedMidValue = math.floor(Config.midValue[1] * clammingIncidentModifier);
+			local modifiedHighValue = math.floor(Config.highValue[1] * clammingIncidentModifier);
+			if (clammy.relativeWeight < 6) or
+				(clammy.money >= modifiedLowValue and clammy.relativeWeight < 7) or
+				(clammy.money >= modifiedMidValue and clammy.relativeWeight < 11) or
+				(clammy.money >= modifiedHighValue and clammy.relativeWeight < 20) or
+				(clammy.money >=  Config.highValue[1] and clammy.bucketSize == 200) then
+				clammy.bucketColor = {1.0, 0.1, 0.0, 1.0};
+				clammy.bucketShouldBeTurnedIn = true;
+				if (Config.useStopTone[1] == true) then
+					clammy.stopSound = true;
+				end
+			else
+				clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
+				clammy.bucketShouldBeTurnedIn = false;
+			end
+		end
+	else
+		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
+		clammy.bucketShouldBeTurnedIn = false;
+	end
+	return clammy;
+end
+
+local writeBucket = function(clammy, item)
+	local fdata = {
+		datetime = os.date('%Y-%m-%d %H:%M:%S'),
+		item = item.item,
+		gil = item.gil[1],
+		vendor = item.vendor[1],
+		moonPercent = clammy.moonTable.moonPercent,
+		bucketsPurchased = clammy.bucketsPurchased,
+		bucketsReceived = clammy.bucketsReceived,
+		hasHQLegs = clammy.hasHQLegs,
+		dayOfWeek = clammy.vanaTime.dayName,
+		currentHour = clammy.vanaTime.hourInt,
+	}
+	table.insert(clammy.trackingBucket, fdata);
+	return clammy;
+end
+
+local playSound = function(clammy)
+	local waveFile = 'clam.wav';
+	if (clammy.stopSound == true) then
+		waveFile = 'stop.wav';
+		clammy.stopSound = false;
+	end
+	if (Config.tone[1] == true) and (clammy.playTone == true) then
+		ashita.misc.play_sound(addon.path:append(waveFile));
+		clammy.playTone = false;
+	end
+    return clammy;
+end
+
+local getClammingBucket = function(clammy)
+	clammy.bucketsPurchased = clammy.bucketsPurchased + 1;
+	clammy.bucketsReceived = clammy.bucketsReceived + 1;
+	clammy.percentRemaining = 1;
+	clammy.hasBucket = true;
+	clammy.bucketIsBroke = false;
+	clammy.bucketStartTime = os.clock();
+    return clammy;
+end
+
+local sessionTimeout = function(clammy)
+	if(Config.resetFullSession[1] == true) then
+		clammy.bucketsPurchased = 0;
+		clammy.bucketsReceived = 0;
+		clammy.sessionValue = 0;
+		clammy.sessionValueAH = 0;
+		clammy.sessionValueNPC = 0;
+		clammy.trueSessionValue = 0;
+		clammy.trueSessionValueNPC = 0;
+		clammy.trueSessionValueAH = 0;
+	end
+	clammy.startingTime = os.clock();
+	clammy.lastClammingAction = os.clock();
+	clammy.fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
+	clammy.filePathBroken =('log_broken_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
+	clammy.filePath = clammy.fileDir .. clammy.fileName;
+	clammy.gilPerHour = 0;
+	clammy.gilPerHourMinusBucket = 0;
+	clammy.clammingAttemptsPerHour = 0;
+	clammy.clammingAttempts = 0;
+	clammy.gilPerHourAH = 0;
+	clammy.gilPerHourNPC = 0;
+	clammy.bucketAverageTime = 0;
+	clammy.bucketTimeWith = 0;
+	clammy.sessionWasReset = false;
+	return clammy;
+end
+
+local updateLastClammingAction = function(clammy)
+	clammy.lastClammingAction = os.clock();
+	if (clammy.sessionWasReset == true) then
+		clammy = sessionTimeout(clammy);
+	end
+	return clammy;
+end
+
+local handleBucket = function(clammy)
+	local hasBucketKI = AshitaCore:GetMemoryManager():GetPlayer():HasKeyItem(511);
+	if (hasBucketKI == true) then
+		if (clammy.hasBucket == false) and (clammy.bucketIsBroke == false) then
+			return getClammingBucket(clammy);
+		end
+		if (clammy.hasBucket == true) and (clammy.bucketIsBroke == true) then
+			clammy = func.emptyBucket(clammy, false, false);
+			clammy = calculateTimePerBucket(clammy);
+			clammy.playTone = true;
+			clammy.stopSound = true;
+			return clammy;
+		end
+		return clammy;
+	else
+		if (clammy.hasBucket == true) and (clammy.bucketIsBroke == false) then
+			clammy = func.emptyBucket(clammy, true, false);
+			clammy = calculateTimePerBucket(clammy);
+			clammy = updateLastClammingAction(clammy);
+			return clammy;
+		end
+		if (clammy.hasBucket == false) and (clammy.bucketIsBroke == true) then
+			clammy.bucketIsBroke = false;
+			clammy = calcRedBucket(clammy);
+			return clammy;
+		end
+		return clammy;
+	end
+end
+
+local calculateChanceOfBreak = function(clammy, remainingWeight)
 	local sixWeightPercent = 0;
 	local sevenWeightPercent = 0;
 	local elevenWeightPercent = 0;
@@ -170,7 +361,7 @@ func.calculateChanceOfBreak = function(clammy, remainingWeight)
 	return returnData;
 end
 
-func.formatChanceBreak = function(percentWeight)
+local formatChanceBreak = function(percentWeight)
 	if (percentWeight == 0) or (percentWeight == 100) then
 		percentWeight = ("%0.0f"):fmt(percentWeight);
 	else
@@ -179,197 +370,7 @@ func.formatChanceBreak = function(percentWeight)
 	return percentWeight;
 end
 
-local function calcRarityDifference()
-	local rarityHQ = T{
-		threeWeightPercent = 0,
-		sixWeightPercent = 0,
-		sevenWeightPercent = 0,
-		elevenWeightPercent = 0,
-		twentyWeightPercent = 0,
-	};
-	local rarityNoHQ = T{
-		threeWeightPercent = 0,
-		sixWeightPercent = 0,
-		sevenWeightPercent = 0,
-		elevenWeightPercent = 0,
-		twentyWeightPercent = 0,
-	};
-
-	local tableToUse = Config.items;
-	for _, item in ipairs(tableToUse) do
-		if (item.weight == 20) then
-			rarityHQ.twentyWeightPercent = rarityHQ.twentyWeightPercent + item.rarity[1];
-		elseif (item.weight == 11) then
-			rarityHQ.elevenWeightPercent = rarityHQ.elevenWeightPercent + item.rarity[1];
-		elseif (item.weight == 7) then
-			rarityHQ.sevenWeightPercent = rarityHQ.sevenWeightPercent + item.rarity[1];
-		elseif (item.weight == 6) then
-			rarityHQ.sixWeightPercent = rarityHQ.sixWeightPercent + item.rarity[1];
-		elseif (item.weight == 3) then
-			rarityHQ.threeWeightPercent = rarityHQ.threeWeightPercent + item.rarity[1];
-		end
-	end
-
-	tableToUse = const.clammingRarityNoHQGear;
-	for _, item in ipairs(tableToUse) do
-		if (item.weight == 20) then
-			rarityNoHQ.twentyWeightPercent = rarityNoHQ.twentyWeightPercent + item.rarity[1];
-		elseif (item.weight == 11) then
-			rarityNoHQ.elevenWeightPercent = rarityNoHQ.elevenWeightPercent + item.rarity[1];
-		elseif (item.weight == 7) then
-			rarityNoHQ.sevenWeightPercent = rarityNoHQ.sevenWeightPercent + item.rarity[1];
-		elseif (item.weight == 6) then
-			rarityNoHQ.sixWeightPercent = rarityNoHQ.sixWeightPercent + item.rarity[1];
-		elseif (item.weight == 3) then
-			rarityNoHQ.threeWeightPercent = rarityNoHQ.threeWeightPercent + item.rarity[1];
-		end
-	end
-
-	local rarityDifference = T{
-		threeWeightPercent = rarityNoHQ.threeWeightPercent - rarityHQ.threeWeightPercent,
-		sixWeightPercent = rarityNoHQ.sixWeightPercent - rarityHQ.sixWeightPercent,
-		sevenWeightPercent = rarityNoHQ.sevenWeightPercent - rarityHQ.sevenWeightPercent,
-		elevenWeightPercent = rarityNoHQ.elevenWeightPercent - rarityHQ.elevenWeightPercent,
-		twentyWeightPercent = rarityNoHQ.twentyWeightPercent - rarityHQ.twentyWeightPercent,
-	};
-	return rarityDifference;
-end
-
-func.calcRedBucket = function(clammy)
-	local rarityModifiers = 1;
-	if (clammy.hasHQLegs == false) then
-		rarityModifiers = calcRarityDifference();
-	end
-	if  (clammy.relativeWeight < 6) or
-		(clammy.money >= Config.lowValue[1] and clammy.relativeWeight < 7) or
-		(clammy.money >= Config.midValue[1] and clammy.relativeWeight < 11) or
-		(clammy.money >= Config.highValue[1] and clammy.relativeWeight < 20) or
-		(clammy.weight > 130) then
-		if (Config.alwaysStopAtThirdBucket[1] == true) then
-			clammy.bucketColor = {1.0, 0.1, 0.0, 1.0};
-			if (Config.useStopTone[1] == true) then
-				clammy.stopSound = true;
-			end
-		elseif (Config.alwaysStopAtThirdBucket[1] == false) then
-			local clammingIncidentModifier = 0.9;
-			if (clammy.hasHQBody == true) then
-				clammingIncidentModifier = 0.95;
-			end
-			local modifiedLowValue = math.floor(Config.lowValue[1] * clammingIncidentModifier);
-			local modifiedMidValue = math.floor(Config.midValue[1] * clammingIncidentModifier);
-			local modifiedHighValue = math.floor(Config.highValue[1] * clammingIncidentModifier);
-			if (clammy.relativeWeight < 6) or
-				(clammy.money >= modifiedLowValue and clammy.relativeWeight < 7) or
-				(clammy.money >= modifiedMidValue and clammy.relativeWeight < 11) or
-				(clammy.money >= modifiedHighValue and clammy.relativeWeight < 20) or
-				(clammy.money >=  Config.highValue[1] and clammy.bucketSize == 200) then
-				clammy.bucketColor = {1.0, 0.1, 0.0, 1.0};
-				if (Config.useStopTone[1] == true) then
-					clammy.stopSound = true;
-				end
-			else
-				clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
-				clammy.stopSound = false;
-			end
-		end
-	else
-		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
-		clammy.stopSound = false;
-	end
-	return clammy;
-end
-
-func.openLogFile = function(clammy, notBroken)
-	if (ashita.fs.create_directory(clammy.fileDir) ~= false) then
-        local file;
-		if notBroken == false then
-			file = io.open(clammy.filePathBroken, 'a');
-		else
-			file = io.open(clammy.filePath, 'a');
-		end
-
-		if (file == nil) then
-			print("Clammy: Could not open log file.")
-		else
-			return file;
-		end
-	end
-end
-
-func.closeLogFile = function(file)
-	if (file ~= nil) then
-		io.close(file)
-	end
-end
-
-func.writeLogFile = function(clammy, item)
-	local file = func.openLogFile(clammy, true);
-
-	if (file ~= nil) then
-		local fdata = ('%s, %s %s\n'):fmt(os.date('%Y-%m-%d %H:%M:%S'), item.item, item.gil[1]);
-		file:write(fdata);
-	end
-
-	func.closeLogFile(file);
-end
-
-func.renderEditor = function(clammy)
-    if (not clammy.editorIsOpen[1]) then
-        return clammy;
-    end
-	local settingsTabHeight = 445;
-	local settingsWindowHeight = 560;
-	if (Config.log[1] == true) then
-		settingsTabHeight = settingsTabHeight + 25;
-		settingsWindowHeight = settingsWindowHeight + 25;
-	end
-	if (Config.tone[1] == true) then
-		settingsTabHeight = settingsTabHeight + 25;
-		settingsWindowHeight = settingsWindowHeight + 25;
-	end
-	if (Config.autoResetLog[1] == true) then
-		settingsTabHeight = settingsTabHeight + 50;
-		settingsWindowHeight = settingsWindowHeight + 50;
-	end
-    imgui.SetNextWindowSize({ 500, settingsWindowHeight, });
-    imgui.SetNextWindowSizeConstraints({ 0, 0, }, { FLT_MAX, FLT_MAX, });
-    if (imgui.Begin('Clammy##Config', clammy.editorIsOpen)) then
-
-        if (imgui.Button('Save Settings')) then
-            Settings.save();
-            print(chat.header(addon.name):append(chat.message('Settings saved.')));
-        end
-        imgui.SameLine();
-        if (imgui.Button('Reset Settings')) then
-            Settings.reset();
-            print(chat.header(addon.name):append(chat.message('Settings reset to defaults.')));
-        end
-        imgui.SameLine();
-        if (imgui.Button('Reset Session')) then
-            clammy = func.resetSession(clammy);
-            print(chat.header(addon.name):append(chat.message('Reset session.')));
-        end
-
-        imgui.Separator();
-
-        if (imgui.BeginTabBar('##clammy_tabbar', ImGuiTabBarFlags_NoCloseWithMiddleMouseButton)) then
-            if (imgui.BeginTabItem('General', nil)) then
-                func.renderGeneralConfig(settingsTabHeight);
-                imgui.EndTabItem();
-            end
-            if (imgui.BeginTabItem('Items', nil)) then
-                func.renderItemListConfig(settingsTabHeight);
-                imgui.EndTabItem();
-            end
-            imgui.EndTabBar();
-        end
-
-    end
-    imgui.End();
-    return clammy;
-end
-
-func.renderGeneralConfig = function(settingsTabHeight)
+local renderGeneralConfig = function(settingsTabHeight)
     imgui.Text('General Settings');
     imgui.BeginChild('settings_general', { 0, settingsTabHeight, }, true);
 		imgui.SliderFloat('Window Scale', Config.windowScaling, 0.1, 2.0, '%.2f');
@@ -380,16 +381,22 @@ func.renderGeneralConfig = function(settingsTabHeight)
         imgui.ShowHelp('Toggles whether total clamming value, gil earned per hour, and buckets purchased should be shown.');
 		imgui.Checkbox('Split gil/hr and total session value by Vendor/AH', Config.splitItemsBySellType);
 		imgui.ShowHelp('Toggles whether session info should show split between items sold to vendor and items sold to AH.');
-        imgui.Checkbox('Track Moon Info', Config.trackMoonPhase);
-        imgui.ShowHelp('Toggles if moon phase should be tracked and shown.');
+        imgui.Checkbox('Show Moon Info', Config.trackMoonPhase);
+        imgui.ShowHelp('Toggles if moon phase should be shown in window.');
+		imgui.Checkbox('Show day of week', Config.showDayOfWeek);
+		imgui.ShowHelp('Show the day of the week in Vana\'diel time.');
         imgui.Checkbox('Set Weight Color Based On Value', Config.colorWeightBasedOnValue);
         imgui.ShowHelp('Toggles if the weight in the window should be based on value of the bucket.');
 		imgui.Checkbox('Show Profit', Config.subtractBucketCostFromGilEarned);
 		imgui.ShowHelp('Subtract cost of buckets from total clamming value amount.');
 		imgui.Checkbox('Show Time per Bucket', Config.showAverageTimePerBucket);
 		imgui.ShowHelp('Calculate and show average time per bucket received.');
+		imgui.Checkbox('Show # of clamming tries', Config.showClammingAttempts);
+		imgui.ShowHelp('Show how many times you\'ve dug and digs per minute.');
 		imgui.Checkbox('Show % chance bucket break', Config.showPercentChanceToBreak);
 		imgui.ShowHelp('Calculates the chance that the next clamming attempt will break your bucket.');
+		imgui.Checkbox('Show Bucket Health', Config.showClammyHealth);
+		imgui.ShowHelp('Show bar representing how much weight remains before your bucket breaks');
 		imgui.Checkbox('Show equipment status', Config.checkEquippedItem);
 		imgui.ShowHelp('Shows whether you are wearing the HQ clamming set.');
 		imgui.Checkbox('No clammy outside the bay', Config.hideInDifferentZone);
@@ -428,7 +435,7 @@ func.renderGeneralConfig = function(settingsTabHeight)
     imgui.EndChild();
 end
 
-func.renderItemListConfig = function(settingsTabHeight)
+local renderItemListConfig = function(settingsTabHeight)
     imgui.BeginChild("settings_items", {0, settingsTabHeight, }, true);
 		imgui.Text('    Item Value:');
 		imgui.ShowHelp('Set sale price of item.');
@@ -579,9 +586,9 @@ func.renderItemListConfig = function(settingsTabHeight)
     imgui.EndChild();
 end
 
-func.resetSession = function(clammy)
+local resetSession = function(clammy)
 	clammy.startingTime = os.clock();
-	clammy.lastClammingAction = os.clock();
+	clammy = updateLastClammingAction(clammy);
 	clammy.bucketStartTime = 0;
 	clammy.fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
 	clammy.filePathBroken =('log_broken_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
@@ -591,42 +598,19 @@ func.resetSession = function(clammy)
 	clammy.gilPerHourMinusBucket = 0;
 	clammy.gilPerHourAH = 0;
 	clammy.gilPerHourNPC = 0;
+	clammy.clammingAttemptsPerHour = 0;
+	clammy.clammingAttempts = 0;
 	clammy.bucketsPurchased = 0;
 	clammy.bucketsReceived = 0;
 	clammy.sessionValue = 0;
 	clammy.sessionValueAH = 0;
 	clammy.sessionValueNPC = 0;
 	clammy.bucketIsBroke = false;
+	clammy.sessionWasReset = false;
 	return clammy;
 end
 
-func.sessionTimeout = function(clammy)
-	if(Config.resetFullSession[1] == true) then
-		clammy.bucketsPurchased = 0;
-		clammy.bucketsReceived = 0;
-		clammy.sessionValue = 0;
-		clammy.sessionValueAH = 0;
-		clammy.sessionValueNPC = 0;
-		clammy.trueSessionValue = 0;
-		clammy.trueSessionValueNPC = 0;
-		clammy.trueSessionValueAH = 0;
-		clammy.bucketIsBroke = false;
-	end
-	clammy.startingTime = os.clock();
-	clammy.lastClammingAction = os.clock();
-	clammy.fileName = ('log_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
-	clammy.filePathBroken =('log_broken_%s.txt'):fmt(os.date('%Y_%m_%d__%H_%M_%S'));
-	clammy.filePath = clammy.fileDir .. clammy.fileName;
-	clammy.gilPerHour = 0;
-	clammy.gilPerHourMinusBucket = 0;
-	clammy.gilPerHourAH = 0;
-	clammy.gilPerHourNPC = 0;
-	clammy.bucketAverageTime = 0;
-	clammy.bucketTimeWith = 0;
-	return clammy;
-end
-
-func.getCurrentEquip = function(clammy)
+local getCurrentEquip = function(clammy)
     local inv = AshitaCore:GetMemoryManager():GetInventory();
     local bodyEquip = inv:GetEquippedItem(5);
 	if (bodyEquip == nil) then
@@ -660,7 +644,7 @@ func.getCurrentEquip = function(clammy)
 	return clammy;
 end
 
-func.formatInt = function(number)
+local formatInt = function(number)
     if (string.len(number) < 4) then
         return number
     end
@@ -683,19 +667,20 @@ func.formatInt = function(number)
     end
 end
 
-func.getTimestamp = function()
+local getTimestamp = function()
     local pVanaTime = ashita.memory.find('FFXiMain.dll', 0, 'B0015EC390518B4C24088D4424005068', 0, 0);
     local pointer = ashita.memory.read_uint32(pVanaTime + 0x34);
     local rawTime = ashita.memory.read_uint32(pointer + 0x0C) + 92514960;
     local timestamp = {};
-    timestamp.day = math.floor(rawTime / 3456);
+	timestamp.day = math.floor(rawTime / 3456);
     timestamp.hour = math.floor(rawTime / 144) % 24;
     timestamp.minute = math.floor((rawTime % 144) / 2.4);
+	timestamp.dayOfWeekInt = (math.floor(rawTime / 3456) % 8);
     return timestamp;
 end
 
-func.getMoon = function(clammy)
-    local timestamp = func.getTimestamp();
+local getMoon = function(clammy)
+    local timestamp = getTimestamp();
     local moonIndex = ((timestamp.day + 26) % 84) + 1;
     if (moonIndex < 43) then
 		clammy.moonTable.moonPercent = const.moonPhasePercent[moonIndex]  * -1;
@@ -706,7 +691,33 @@ func.getMoon = function(clammy)
     return clammy;
 end
 
-func.formatTimestamp = function(timer)
+local getVanaTime = function(clammy)
+	local timestamp = getTimestamp();
+	local daysOfWeekColorTable = T{
+		Firesday = {colorConverter(255), colorConverter(40), colorConverter(40), 1},
+		Earthsday = {colorConverter(200), colorConverter(200), colorConverter(0), 1},
+		Watersday = {colorConverter(0), colorConverter(109), colorConverter(160), 1},
+		Windsday = {colorConverter(48), colorConverter(200), colorConverter(48), 1},
+		Iceday = {colorConverter(150), colorConverter(150), colorConverter(240), 1},
+		Lightningday = {colorConverter(255), colorConverter(181), colorConverter(255), 1},
+		Lightsday = {colorConverter(227), colorConverter(227), colorConverter(227), 1},
+		Darksday = {colorConverter(15), colorConverter(15), colorConverter(16), 1},
+	}
+	for _, day in ipairs(const.daysOfWeek) do
+		if timestamp.dayOfWeekInt == day.dayInt then
+			clammy.vanaTime.dayName = day.Name;
+			clammy.vanaTime.dayOfWeekColor = daysOfWeekColorTable[day.Name];
+		end
+	end
+	if clammy.vanaTime.dayOfWeekColor == nil then
+		clammy.vanaTime.dayName = 'Unknown day!?';
+		clammy.vanaTime.dayOfWeekColor = {colorConverter(255), colorConverter(255), colorConverter(255), 1};
+	end
+	clammy.vanaTime.hourInt = timestamp.hour;
+	return clammy;
+end
+
+local formatTimestamp = function(timer)
     local hours = math.floor(timer / 3600);
     local minutes = math.floor((timer / 60) - (hours * 60));
     local seconds = math.floor(timer - (hours * 3600) - (minutes * 60));
@@ -714,7 +725,7 @@ func.formatTimestamp = function(timer)
     return ('%0.2i:%0.2i:%0.2i'):fmt(hours, minutes, seconds);
 end
 
-func.toggleShowValue = function(shouldShowValue)
+local toggleShowValue = function(shouldShowValue)
 	if (shouldShowValue == "true") or (shouldShowValue == nil and Config.showValue[1] == false) then
 		Config.showValue[1] = true;
 		print(chat.header(addon.name):append(chat.message('Show value turned on.')));
@@ -725,7 +736,7 @@ func.toggleShowValue = function(shouldShowValue)
 	Settings.save();
 end
 
-func.toggleLogAllResults = function(shouldLogAllResults)
+local toggleLogAllResults = function(shouldLogAllResults)
 	if (shouldLogAllResults == "true") or
         (shouldLogAllResults == nil and Config.legacyLog[1] == false) then
 		Config.legacyLog[1] = true;
@@ -739,7 +750,7 @@ func.toggleLogAllResults = function(shouldLogAllResults)
 	Settings.save();
 end
 
-func.toggleShowSessionInfo = function(shouldShowSessionInfo)
+local toggleShowSessionInfo = function(shouldShowSessionInfo)
 	if (shouldShowSessionInfo == "true") or (shouldShowSessionInfo == nil and Config.showSessionInfo[1] == false) then
 		Config.showSessionInfo[1] = true;
 		print(chat.header(addon.name):append(chat.message('Showing gil earned and gil per hour.')));
@@ -751,7 +762,7 @@ func.toggleShowSessionInfo = function(shouldShowSessionInfo)
 	Settings.save();
 end
 
-func.toggleUseBucketValueForWeightColor = function(shouldUseBucketValueForWeightColor)
+local toggleUseBucketValueForWeightColor = function(shouldUseBucketValueForWeightColor)
 	if (shouldUseBucketValueForWeightColor == 'true') or
         (shouldUseBucketValueForWeightColor == nil and Config.colorWeightBasedOnValue[1] == false) then
 		Config.colorWeightBasedOnValue[1] = true;
@@ -766,7 +777,7 @@ func.toggleUseBucketValueForWeightColor = function(shouldUseBucketValueForWeight
 	Settings.save();
 end
 
-func.setWeightValues = function(weightLevel, value)
+local setWeightValues = function(weightLevel, value)
 	if(weightLevel == 'highvalue') then
 		Config.highValue[1] = tonumber(value);
 		HighValue = tonumber(value);
@@ -790,7 +801,7 @@ func.setWeightValues = function(weightLevel, value)
 	Settings.save();
 end
 
-func.toggleShowItems = function(shouldShowItems)
+local toggleShowItems = function(shouldShowItems)
 	if (shouldShowItems == "true") or
         (shouldShowItems == nil and Config.showItems[1] == false) then
 		Config.showItems[1] = true;
@@ -804,7 +815,7 @@ func.toggleShowItems = function(shouldShowItems)
 	Settings.save();
 end
 
-func.toggleLogItems = function(shouldLogItems)
+local toggleLogItems = function(shouldLogItems)
 	if (shouldLogItems == "true") or (shouldLogItems == nil and Config.log[1] == false) then
 		Config.log[1] = true;
 		print(chat.header(addon.name):append(chat.message('Logging items turned on.')));
@@ -816,7 +827,7 @@ func.toggleLogItems = function(shouldLogItems)
 	Settings.save();
 end
 
-func.togglePlayTone = function(shouldPlayTone)
+local togglePlayTone = function(shouldPlayTone)
 	if (shouldPlayTone == "true") or (shouldPlayTone == nil and Config.tone[1] == false) then
 		Config.tone[1] = true;
 		print(chat.header(addon.name):append(chat.message('Play tone turned on.')));
@@ -828,7 +839,7 @@ func.togglePlayTone = function(shouldPlayTone)
 	Settings.save();
 end
 
-func.toggleTrackMoon = function(shouldShowMoon)
+local toggleTrackMoon = function(shouldShowMoon)
     if (shouldShowMoon == "true") or (shouldShowMoon == nil and Config.trackMoonPhase[1] == false) then
         Config.trackMoonPhase[1] = true;
         print(chat.header(addon.name):append(chat.message('Display Moon turned on.')));
@@ -838,6 +849,67 @@ func.toggleTrackMoon = function(shouldShowMoon)
     end
 
     Settings.save();
+end
+
+func.emptyBucket = function(clammy, turnedIn, isReset)
+    clammy.bucketSize = 50;
+	clammy.weight = 0;
+	clammy.relativeWeight = 50;
+	clammy.percentRemaining = 0;
+	clammy.money = 0;
+	clammy.hasBucket = false;
+	clammy.showItemSeparator = false;
+
+	for idx,citem in ipairs(clammy.items) do
+		clammy.bucket[idx] = 0;
+	end
+	if (isReset == false) then
+        if (Config.log[1] == true) and (Config.legacyLog[1] == false) then
+            local file = openLogFile(clammy, turnedIn);
+            for _,row in ipairs(clammy.trackingBucket) do
+                if turnedIn == true then
+                    clammy.sessionValue = clammy.sessionValue + row.gil;
+                    if(row.vendor == true) then
+                        clammy.sessionValueNPC = clammy.sessionValueNPC + row.gil;
+                    else
+                        clammy.sessionValueAH = clammy.sessionValueAH + row.gil;
+                    end
+                end
+				-- CSV columns:
+				-- DateTime (String), Item Name(String), Configured Item Sell price when placed in bucket(Int), Whether or not the item is sold to a vendor(Bool),
+				-- Percentage of moon phase (Signed Int), Number of buckets paid for(Int), Number of buckets received including transfer buckets (Int), 
+				-- Whether or not HQ clamming legs are equipped (Bool), Current vana'diel day of the week(String), Current vana'diel hour (Int) 
+                local fdata = ('%s, %s, %s, %s, %s, %s, %s, %s, %s, %s\n'):fmt(
+                    row.datetime,
+                    row.item,
+                    row.gil,
+                    row.vendor,
+                    row.moonPercent,
+                    row.bucketsPurchased,
+					row.bucketsReceived,
+					row.hasHQLegs,
+					row.dayOfWeek,
+					row.currentHour
+                );
+                file:write(fdata);
+            end
+            closeLogFile(file);
+        end
+    end
+
+	clammy.trackingBucket = {};
+	if Config.subtractBucketCostFromGilEarned[1] == true then
+		clammy.trueSessionValue = clammy.sessionValue - (clammy.bucketsPurchased * 500);
+	else
+		clammy.trueSessionValue = clammy.sessionValue;
+	end
+	clammy.trueSessionValueNPC = clammy.sessionValueNPC;
+	clammy.trueSessionValueAH = clammy.sessionValueAH;
+	clammy = updateGilPerHour(clammy);
+	if isReset == true then
+		clammy.bucketAverageTime = 0;
+	end
+	return clammy;
 end
 
 func.handleChatCommands = function(args, clammy)
@@ -857,7 +929,7 @@ func.handleChatCommands = function(args, clammy)
     end
 
 	if (#args == 2 and args[2]:any('resetsession')) then
-		clammy = func.resetSession(clammy);
+		clammy = resetSession(clammy);
 		print(chat.header(addon.name):append(chat.message('Session reset.')));
 		return clammy;
 	end
@@ -873,47 +945,55 @@ func.handleChatCommands = function(args, clammy)
 			
 		elseif (args[3]:any('setbucketsize')) then
 			clammy.bucketSize = tonumber(args[4]);
+
+		elseif (args[3]:any('breakbucket')) then
+			clammy.bucketIsBroke = true;
 		end
 		return clammy;
 	end
 
     if (args[2]:any('showvalue')) then --turns loggin on/off
-        func.toggleShowValue(args[3])
+        toggleShowValue(args[3])
         return clammy;
     end
 
 	if(args[2]:any('logbrokenbucketitems')) then
-		func.toggleLogAllResults(args[3]);
+		toggleLogAllResults(args[3]);
         return clammy;
 	end
 
 	if(args[2]:any('showsessioninfo')) then
-		func.toggleShowSessionInfo(args[3]);
+		toggleShowSessionInfo(args[3]);
         return clammy;
 	end
 
 	if(args[2]:any('usebucketvalueforweightcolor')) then
-		func.toggleUseBucketValueForWeightColor(args[3]);
+		toggleUseBucketValueForWeightColor(args[3]);
 		return clammy;
 	end
 
 	if(args[2]:any('setweightvalues')) then
-		func.setWeightValues(args[3], args[4]);
+		setWeightValues(args[3], args[4]);
+		return clammy;
+	end
+
+	if(args[2]:any('showmoon')) then
+		toggleTrackMoon(args[3]);
 		return clammy;
 	end
 
 	if (#args == 3 and args[2]:any('showitems')) then --turns loggin on/off
-        func.toggleShowItems(args[3]);
+        toggleShowItems(args[3]);
         return clammy;
     end
 
 	if (#args == 3 and args[2]:any('log')) then --turns loggin on/off
-       func.toggleLogItems(args[3]);
+    	toggleLogItems(args[3]);
         return clammy;
     end
 
 	if (#args == 3 and args[2]:any('tone')) then --turns ready tone on/off
-        func.togglePlayTone(args[3]);
+        togglePlayTone(args[3]);
         return clammy;
     end
 
@@ -923,7 +1003,12 @@ end
 
 func.handleTextIn = function(e, clammy)
 
-	local now = os.clock();
+	local hasBucketKI = AshitaCore:GetMemoryManager():GetPlayer():HasKeyItem(511);
+	local areaId = AshitaCore:GetMemoryManager():GetParty():GetMemberZone(0);
+	if (areaId ~= 4) then
+		return clammy;
+	end
+
     local weightColor = {
         {diff=200, color={1.0, 1.0, 1.0, 1.0}},
         {diff=35, color={1.0, 1.0, 0.8, 1.0}},
@@ -934,77 +1019,51 @@ func.handleTextIn = function(e, clammy)
         {diff=3, color={1.0, 0.3, 0.0, 1.0}},
     }
 
-    if (string.match(e.message, "You return the")) then
-		clammy = func.emptyBucket(clammy, true, false);
-		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
-		clammy = func.calculateTimePerBucket(clammy);
-		clammy.lastClammingAction = now;
-		return clammy;
-	end
-
-	if (string.match(e.message, "Obtained key item:")) then
-		clammy.bucketsPurchased = clammy.bucketsPurchased + 1;
-		clammy.bucketsReceived = clammy.bucketsReceived + 1;
-		clammy.hasBucket = true;
-		clammy.bucketIsBroke = false;
-		clammy.bucketStartTime = os.clock();
-        return clammy;
-	end
-
 	--Your clamming capacity has increased to XXX ponzes!
 	if (string.match(e.message, "Your clamming capacity has increased to")) then
 		clammy.bucketSize = clammy.bucketSize + 50;
+		clammy.percentRemaining = 1;
 		clammy.bucketsReceived = clammy.bucketsReceived + 1;
 		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
-		clammy = func.calculateTimePerBucket(clammy);
+		clammy.bucketShouldBeTurnedIn = false;
+		clammy = calculateTimePerBucket(clammy);
 		clammy.bucketStartTime = os.clock();
 		clammy.relativeWeight = clammy.relativeWeight + 50;
-		clammy.lastClammingAction = now;
+		clammy = updateLastClammingAction(clammy);
 		return clammy;
 	end
 
-	if (string.match(e.message, "All your shellfish are washed back into the sea")) then
-		clammy = func.emptyBucket(clammy, false, false);
-		clammy.bucketIsBroke = true;
-		clammy.bucketColor = {1.0, 1.0, 1.0, 1.0};
-		clammy = func.calculateTimePerBucket(clammy);
-		clammy.playTone = true;
-		clammy.stopSound = true;
-		return clammy;
-	end
-
-	if (string.match(e.message, 'Why you ungrateful sonnuva...')) then
-		clammy.bucketIsBroke = false;
-		clammy.hasBucket = false;
-		return clammy;
-	end
-
-	if (string.match(e.message, "You find a")) then
+	if (string.match(e.message, "You find a") and (hasBucketKI == true)) then
 		for idx,citem in ipairs(clammy.items) do
 			if (string.match(string.lower(e.message), string.lower(citem.item)) ~= nil) then
-				clammy = func.writeBucket(clammy, citem);
-				clammy.lastClammingAction = now;
+				clammy = writeBucket(clammy, citem);
+				clammy = updateLastClammingAction(clammy);
 				clammy.weight = clammy.weight + citem.weight;
 				clammy.money = clammy.money + citem.gil[1];
 				clammy.bucket[idx] = clammy.bucket[idx] + 1;
 				clammy.cooldown =  os.clock() + 10.5;
-
+				clammy.clammingAttempts = clammy.clammingAttempts + 1;
 				if Config.colorWeightBasedOnValue[1] == false then
 					for _, item in ipairs(weightColor) do
 						if ((clammy.bucketSize - clammy.weight) < item.diff) then
 							clammy.bucketColor = item.color;
 						end
 					end
-				else
-					clammy.relativeWeight = clammy.bucketSize - clammy.weight;
 				end
+				clammy.relativeWeight = clammy.bucketSize - clammy.weight;
+				local bucketScalar = clammy.bucketSize / 50;
+				local relativeBucketSize = clammy.bucketSize / bucketScalar;
+				clammy.percentRemaining = (clammy.relativeWeight % 50) / relativeBucketSize;
 				clammy.hasBucket = true;
 				clammy.playTone = true;
 
 				if (Config.log[1] == true) and (Config.legacyLog[1] == true) then
-					clammy.writeLogFile(citem);
+					writeLogFile(citem);
 				end
-
+				if (string.match(e.message, "All your shellfish are washed back into the sea")) then
+					clammy.stopSound = true;
+					clammy.bucketIsBroke = true;
+				end
 				return clammy;
 			end
 		end
@@ -1012,22 +1071,93 @@ func.handleTextIn = function(e, clammy)
     return clammy;
 end
 
-func.renderClammy = function(clammy)
-	local windowSize = (300 * Config.windowScaling[1]);
-    imgui.SetNextWindowBgAlpha(0.8);
-    imgui.SetNextWindowSize({ windowSize, -1, }, ImGuiCond_Always);
-	local player = GetPlayerEntity();
-	if (player ~= nil) then
-		clammy = func.getCurrentEquip(clammy);
+func.renderEditor = function(clammy)
+    if (not clammy.editorIsOpen[1]) then
+        return clammy;
+    end
+	local settingsTabHeight = 520;
+	local settingsWindowHeight = 645;
+	if (Config.log[1] == true) then
+		settingsTabHeight = settingsTabHeight + 25;
+		settingsWindowHeight = settingsWindowHeight + 25;
 	end
+	if (Config.tone[1] == true) then
+		settingsTabHeight = settingsTabHeight + 25;
+		settingsWindowHeight = settingsWindowHeight + 25;
+	end
+	if (Config.autoResetLog[1] == true) then
+		settingsTabHeight = settingsTabHeight + 50;
+		settingsWindowHeight = settingsWindowHeight + 50;
+	end
+    imgui.SetNextWindowSize({ 500, settingsWindowHeight, });
+    imgui.SetNextWindowSizeConstraints({ 0, 0, }, { FLT_MAX, FLT_MAX, });
+    if (imgui.Begin('Clammy##Config', clammy.editorIsOpen)) then
+
+        if (imgui.Button('Save Settings')) then
+            Settings.save();
+            print(chat.header(addon.name):append(chat.message('Settings saved.')));
+        end
+        imgui.SameLine();
+        if (imgui.Button('Reset Settings')) then
+            Settings.reset();
+            print(chat.header(addon.name):append(chat.message('Settings reset to defaults.')));
+        end
+        imgui.SameLine();
+        if (imgui.Button('Reset Session')) then
+            clammy = resetSession(clammy);
+            print(chat.header(addon.name):append(chat.message('Reset session.')));
+        end
+
+        imgui.Separator();
+
+        if (imgui.BeginTabBar('##clammy_tabbar', ImGuiTabBarFlags_NoCloseWithMiddleMouseButton)) then
+            if (imgui.BeginTabItem('General', nil)) then
+                renderGeneralConfig(settingsTabHeight);
+                imgui.EndTabItem();
+            end
+            if (imgui.BeginTabItem('Items', nil)) then
+                renderItemListConfig(settingsTabHeight);
+                imgui.EndTabItem();
+            end
+            imgui.EndTabBar();
+        end
+
+    end
+    imgui.End();
+    return clammy;
+end
+
+func.renderClammy = function(clammy)
+	-- handling if player is nil zoning
+	local player = GetPlayerEntity();
+	local areaId = AshitaCore:GetMemoryManager():GetParty():GetMemberZone(0);
+	if ((areaId ~= 4) and (Config.hideInDifferentZone[1] == true)) then -- when zoning or outside Bibiki Bay
+		return clammy;
+	end
+	if (player ~= nil) then
+		clammy = getCurrentEquip(clammy);
+	end
+
+	-- 
+	clammy = handleBucket(clammy);
+	clammy = getVanaTime(clammy);
+	clammy = getMoon(clammy);
+	local bucketBreakChance = calculateChanceOfBreak(clammy, (clammy.bucketSize - clammy.weight));
+
+	-- Handling auto reset of session
 	local now = os.clock();
 	local timeBeforeReset = now - (Config.minutesBeforeAutoReset[1] * 60);
 	if (clammy.lastClammingAction < timeBeforeReset) and
 		(Config.autoResetLog[1] == true) and
 		(clammy.hasBucket == false) then
-		clammy = func.sessionTimeout(clammy);
+		clammy.lastClammingAction = now;
+		clammy.sessionWasReset = true;
 	end
+		clammy.clammingAttemptsPerHour = (clammy.clammingAttempts / ((now - clammy.startingTime) / 60));
 
+	local windowSize = (300 * Config.windowScaling[1]);
+    imgui.SetNextWindowBgAlpha(0.8);
+    imgui.SetNextWindowSize({ windowSize, -1, }, ImGuiCond_Always);
 	if (imgui.Begin('Clammy', true, bit.bor(ImGuiWindowFlags_NoDecoration))) then
 
 		local normalFontSize = 1 * Config.windowScaling[1];
@@ -1039,10 +1169,7 @@ func.renderClammy = function(clammy)
 		else
 			imgui.TextColored({0.9, 0.9, 0.0, 1.0}, "Bucket")
 		end
-		if (Config.trackMoonPhase[1] == true) then
-			clammy = func.getMoon(clammy);
-		end
-		clammy = func.calcRedBucket(clammy);
+		clammy = calcRedBucket(clammy);
 		imgui.SameLine()
 		imgui.Text("Weight [" .. clammy.bucketSize .. "]:");
 		imgui.SameLine();
@@ -1053,23 +1180,33 @@ func.renderClammy = function(clammy)
 		imgui.SameLine();
 		imgui.SetCursorPosX(imgui.GetCursorPosX() + imgui.GetColumnWidth() - imgui.GetStyle().FramePadding.x - imgui.CalcTextSize("[999]"));
 		local cdTime = math.floor(clammy.cooldown - os.clock());
-		if (Config.useStopTone[1] == true and clammy.stopSound == true) then
+		if (Config.useStopTone[1] == true and (clammy.stopSound == true or clammy.bucketIsBroke == true)) then
 			cdTime = cdTime - 9;
 		end
 		if (cdTime <= 0) then
 			imgui.TextColored({ 0.5, 1.0, 0.5, 1.0 }, "  [*]");
-			if (clammy.bucketIsBroke == true) then
-				clammy.stopSound = true;
-			end
-			clammy = func.playSound(clammy);
+			clammy = playSound(clammy);
 		else
 			imgui.TextColored({ 1.0, 1.0, 0.5, 1.0 }, "  [" .. cdTime .. "]");
 		end
+		if (Config.showValue[1] == true) then
+			imgui.Text("Estimated Value: " .. formatInt(clammy.money));
+		end
+		if (Config.showClammyHealth[1] == true) then
+			local barcolor = T{0, 0.75, 0, 1};
+			if (clammy.bucketShouldBeTurnedIn == true) then
+				barcolor = {1, 0.1, 0, 1};
+			elseif (bucketBreakChance.percentWeight > 0) then
+				barcolor = bucketBreakChance.color;
+			end
+			imgui.PushStyleColor(ImGuiCol_PlotHistogram, barcolor);
+			imgui.ProgressBar(clammy.percentRemaining, {-1.0, 0}, "Bucket Health ".. (clammy.percentRemaining * 100).. "%");
+			imgui.PopStyleColor(1);
+		end
 		if (Config.showPercentChanceToBreak[1] == true) then
-			local bucketBreakChance = func.calculateChanceOfBreak(clammy, (clammy.bucketSize - clammy.weight));
 			imgui.Text("Percent chance to break: "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:  "));
 			imgui.SetWindowFontScale(enlargedFontSize); imgui.SetCursorPosY(imgui.GetCursorPosY() - (2 * Config.windowScaling[1]));
-			imgui.TextColored(bucketBreakChance.color, func.formatChanceBreak(bucketBreakChance.percentWeight)); imgui.SameLine();
+			imgui.TextColored(bucketBreakChance.color, formatChanceBreak(bucketBreakChance.percentWeight)); imgui.SameLine();
 			imgui.SetWindowFontScale(normalFontSize); imgui.SetCursorPosY(imgui.GetCursorPosY() + (2 * Config.windowScaling[1]));
 			if (string.len(bucketBreakChance.percentWeight) == 1) then
 				imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:   " .. bucketBreakChance.percentWeight));
@@ -1081,9 +1218,6 @@ func.renderClammy = function(clammy)
 				imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:    " .. bucketBreakChance.percentWeight));
 			end
 			imgui.Text("%");
-		end
-		if (Config.showValue[1] == true) then
-			imgui.Text("Estimated Value: " .. func.formatInt(clammy.money));
 		end
 		local textColor = {0.0, 0.75, 0.60, 1};
 		if (Config.showSessionInfo[1] == true) then
@@ -1099,36 +1233,36 @@ func.renderClammy = function(clammy)
 				imgui.Text("Gil made"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Gil made  "));
 				imgui.TextColored(textColor,"(Profit)"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Gil made  (Profit)"));
 				imgui.Text(":"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
-				imgui.Text("".. func.formatInt(clammy.sessionValue)); imgui.SameLine();
-				imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   " .. func.formatInt(clammy.sessionValue) .. " "));
-				imgui.TextColored(textColor, "(" .. func.formatInt(clammy.trueSessionValue) .. ")");
+				imgui.Text("".. formatInt(clammy.sessionValue)); imgui.SameLine();
+				imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   " .. formatInt(clammy.sessionValue) .. " "));
+				imgui.TextColored(textColor, "(" .. formatInt(clammy.trueSessionValue) .. ")");
 			else
 				imgui.Text("Gil made: "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
-				imgui.Text("" .. func.formatInt(clammy.trueSessionValue));
+				imgui.Text("" .. formatInt(clammy.trueSessionValue));
 			end
 
 			if (Config.splitItemsBySellType[1] == true) then
 				imgui.Text("Total gil earned(NPC): "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
-				imgui.Text("" .. func.formatInt(clammy.trueSessionValueNPC));
+				imgui.Text("" .. formatInt(clammy.trueSessionValueNPC));
 				imgui.Text("Total gil earned(AH): "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
-				imgui.Text("" .. func.formatInt(clammy.trueSessionValueAH));
+				imgui.Text("" .. formatInt(clammy.trueSessionValueAH));
 			end
 			if(Config.subtractBucketCostFromGilEarned[1] == true) then
 				imgui.Text("Gil/hr"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Gil/hr  "));
 				imgui.TextColored(textColor, "(Profit)"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Gil/hr  (Profit)"));
 				imgui.Text(":"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
-				imgui.Text(""  .. func.formatInt(clammy.gilPerHour)) imgui.SameLine();
-				imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "   .. func.formatInt(clammy.gilPerHour) .. " "));
-				imgui.TextColored(textColor, "(" .. func.formatInt(clammy.gilPerHourMinusBucket) .. ")");
+				imgui.Text(""  .. formatInt(clammy.gilPerHour)) imgui.SameLine();
+				imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "   .. formatInt(clammy.gilPerHour) .. " "));
+				imgui.TextColored(textColor, "(" .. formatInt(clammy.gilPerHourMinusBucket) .. ")");
 			else
 				imgui.Text("Gil/hr: "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
-				imgui.Text("" .. func.formatInt(clammy.gilPerHour));
+				imgui.Text("" .. formatInt(clammy.gilPerHour));
 			end
 			if (Config.splitItemsBySellType[1] == true) then
 				imgui.Text("Gil/hr(NPC): "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
-				imgui.Text("" .. func.formatInt(clammy.gilPerHourNPC));
+				imgui.Text("" .. formatInt(clammy.gilPerHourNPC));
 				imgui.Text("Gil/hr(AH): "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Total gil earned(NPC):   "));
-				imgui.Text("" .. func.formatInt(clammy.gilPerHourAH));
+				imgui.Text("" .. formatInt(clammy.gilPerHourAH));
 			end
 			imgui.Separator();
 
@@ -1137,23 +1271,30 @@ func.renderClammy = function(clammy)
 				imgui.Text("Buckets"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets "));
 				imgui.TextColored(textColor, "(Bought)(Spent)"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets (Bought)(Spent)"));
 				imgui.Text(": " .. clammy.bucketsReceived); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets  Bought)(Gil):    " .. clammy.bucketsReceived));
-				imgui.TextColored(textColor, "(".. func.formatInt(clammy.bucketsPurchased) .. ")(" .. func.formatInt(bucketCost) .. ")");
+				imgui.TextColored(textColor, "(".. formatInt(clammy.bucketsPurchased) .. ")(" .. formatInt(bucketCost) .. ")");
 			else
 				imgui.Text("Buckets : "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets  (Gil spent):    "));
 				imgui.Text("" .. clammy.bucketsPurchased);
 			end
-			local now = os.clock();
 			imgui.Text("Session length:"); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets (Bought)(Spent): "));
-			imgui.Text("".. func.formatTimestamp(now - clammy.startingTime))
+			imgui.Text("".. formatTimestamp(now - clammy.startingTime))
 			if Config.showAverageTimePerBucket[1] == true then
 				imgui.Text('Avg time/bucket:'); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Buckets (Bought)(Spent): "));
-				imgui.Text('' .. func.formatTimestamp(clammy.bucketAverageTime));
+				imgui.Text('' .. formatTimestamp(clammy.bucketAverageTime));
 			end
+		end
+		if (Config.showClammingAttempts[1] == true) then
+			imgui.Text('Clamming digs:          '.. clammy.clammingAttempts .. " (" .. math.round(clammy.clammingAttemptsPerHour, 1) .. " dpm)")
 		end
 		if (Config.trackMoonPhase[1] == true) then
 			imgui.Separator();
 			imgui.Text("Current moon phase is: " .. clammy.moonTable.moonPhase);
 			imgui.Text("Current moon phase percentage is: " .. clammy.moonTable.moonPercent .. "%");
+		end
+		if (Config.showDayOfWeek[1] == true) then
+			imgui.Separator();
+			imgui.Text("The current day is: "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("The current day is:  "))
+			imgui.TextColored(clammy.vanaTime.dayOfWeekColor, "".. clammy.vanaTime.dayName);
 		end
 
 		if (Config.checkEquippedItem[1] == true) then
@@ -1181,7 +1322,7 @@ func.renderClammy = function(clammy)
 					clammy.showItemSeparator = true;
 					imgui.Text(" - " .. Config.items[idx].item .. " [" .. clammy.bucket[idx] .. "]");
 					imgui.SameLine();
-					local valTxt = "(" .. func.formatInt(Config.items[idx].gil[1] * clammy.bucket[idx]) .. ")"
+					local valTxt = "(" .. formatInt(Config.items[idx].gil[1] * clammy.bucket[idx]) .. ")"
 					local x, _  = imgui.CalcTextSize(valTxt);
 					imgui.SetCursorPosX(imgui.GetCursorPosX() + imgui.GetColumnWidth() - x - imgui.GetStyle().FramePadding.x);
 					imgui.Text(valTxt);
