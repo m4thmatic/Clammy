@@ -231,8 +231,14 @@ end
 
 local sessionTimeout = function(clammy)
 	if(Config.resetFullSession[1] == true) then
-		clammy.bucketsPurchased = 0;
-		clammy.bucketsReceived = 0;
+		local hasBucketKI = AshitaCore:GetMemoryManager():GetPlayer():HasKeyItem(511);
+		if hasBucketKI == true then
+			clammy.bucketsPurchased = 1;
+			clammy.bucketsReceived = 1;
+		else
+			clammy.bucketsPurchased = 0;
+			clammy.bucketsReceived = 0;
+		end
 		clammy.sessionValue = 0;
 		clammy.sessionValueAH = 0;
 		clammy.sessionValueNPC = 0;
@@ -587,6 +593,8 @@ local renderItemListConfig = function(settingsTabHeight)
 end
 
 local resetSession = function(clammy)
+	local hasBucketKI = AshitaCore:GetMemoryManager():GetPlayer():HasKeyItem(511);
+
 	clammy.startingTime = os.clock();
 	clammy = updateLastClammingAction(clammy);
 	clammy.bucketStartTime = 0;
@@ -600,8 +608,13 @@ local resetSession = function(clammy)
 	clammy.gilPerHourNPC = 0;
 	clammy.clammingAttemptsPerHour = 0;
 	clammy.clammingAttempts = 0;
-	clammy.bucketsPurchased = 0;
-	clammy.bucketsReceived = 0;
+	if hasBucketKI == true then
+		clammy.bucketsPurchased = 1;
+		clammy.bucketsReceived = 1;
+	else
+		clammy.bucketsPurchased = 0;
+		clammy.bucketsReceived = 0;
+	end
 	clammy.sessionValue = 0;
 	clammy.sessionValueAH = 0;
 	clammy.sessionValueNPC = 0;
@@ -1053,7 +1066,11 @@ func.handleTextIn = function(e, clammy)
 				clammy.relativeWeight = clammy.bucketSize - clammy.weight;
 				local bucketScalar = clammy.bucketSize / 50;
 				local relativeBucketSize = clammy.bucketSize / bucketScalar;
-				clammy.percentRemaining = (clammy.relativeWeight % 50) / relativeBucketSize;
+				if (clammy.relativeWeight > 50) then
+					clammy.percentRemaining = 1;
+				else
+					clammy.percentRemaining = (clammy.relativeWeight % 50) / relativeBucketSize;
+				end
 				clammy.hasBucket = true;
 				clammy.playTone = true;
 
@@ -1153,7 +1170,7 @@ func.renderClammy = function(clammy)
 		clammy.lastClammingAction = now;
 		clammy.sessionWasReset = true;
 	end
-		clammy.clammingAttemptsPerHour = (clammy.clammingAttempts / ((now - clammy.startingTime) / 60));
+	clammy.clammingAttemptsPerHour = (clammy.clammingAttempts / ((now - clammy.startingTime) / 60));
 
 	local windowSize = (300 * Config.windowScaling[1]);
     imgui.SetNextWindowBgAlpha(0.8);

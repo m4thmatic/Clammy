@@ -23,7 +23,7 @@
 addon.author   = 'MathMatic/DrifterX';
 addon.name     = 'Clammy';
 addon.desc     = 'Clamming calculator: displays bucket weight, items in bucket, & approximate value.';
-addon.version  = '1.2.0';
+addon.version  = '1.2.1';
 
 require('common');
 local const = require('constants');
