@@ -4,6 +4,8 @@ local chat = require('chat');
 local imgui = require('imgui');
 local func = T{};
 local colorConverter = imgui.ColorConvertU32ToFloat4;
+local defaultFont = imgui.GetFont();
+local defaultFontSize = imgui.GetFontSize();
 
 local openLogFile = function(clammy, notBroken)
 	if (ashita.fs.create_directory(clammy.fileDir) ~= false) then
@@ -378,7 +380,7 @@ end
 
 local renderGeneralConfig = function(settingsTabHeight)
     imgui.Text('General Settings');
-    imgui.BeginChild('settings_general', { 0, settingsTabHeight, }, true);
+    imgui.BeginChild('settings_general', { 0, settingsTabHeight, }, ImGuiChildFlags_Borders);
 		imgui.SliderFloat('Window Scale', Config.windowScaling, 0.1, 2.0, '%.2f');
 		imgui.ShowHelp('Scale the window bigger/smaller.');
         imgui.Checkbox('Items in Bucket', Config.showItems);
@@ -442,7 +444,7 @@ local renderGeneralConfig = function(settingsTabHeight)
 end
 
 local renderItemListConfig = function(settingsTabHeight)
-    imgui.BeginChild("settings_items", {0, settingsTabHeight, }, true);
+    imgui.BeginChild("settings_items", {0, settingsTabHeight, }, ImGuiChildFlags_Borders);
 		imgui.Text('    Item Value:');
 		imgui.ShowHelp('Set sale price of item.');
 		imgui.SameLine();
@@ -1177,8 +1179,8 @@ func.renderClammy = function(clammy)
     imgui.SetNextWindowSize({ windowSize, -1, }, ImGuiCond_Always);
 	if (imgui.Begin('Clammy', true, bit.bor(ImGuiWindowFlags_NoDecoration))) then
 
-		local normalFontSize = 1 * Config.windowScaling[1];
-		local enlargedFontSize = 1.3 * Config.windowScaling[1];
+		local normalFontSize = 1 * Config.windowScaling[1] * defaultFontSize;
+		local enlargedFontSize = 1.3 * Config.windowScaling[1] * defaultFontSize;
 		if (clammy.hasBucket == true) then
 			imgui.TextColored({0.0, 1.0, 0.0, 1.0}, "Bucket")
 		elseif(clammy.bucketIsBroke == true) then
@@ -1190,10 +1192,11 @@ func.renderClammy = function(clammy)
 		imgui.SameLine()
 		imgui.Text("Weight [" .. clammy.bucketSize .. "]:");
 		imgui.SameLine();
-		imgui.SetWindowFontScale(enlargedFontSize);
+		imgui.PushFont(defaultFont, enlargedFontSize);
 		imgui.SetCursorPosY(imgui.GetCursorPosY() - (2 * Config.windowScaling[1]));
 		imgui.TextColored(clammy.bucketColor, tostring(clammy.weight));
-		imgui.SetWindowFontScale(normalFontSize);
+		imgui.PopFont();
+		imgui.PushFont(defaultFont, normalFontSize);
 		imgui.SameLine();
 		imgui.SetCursorPosX(imgui.GetCursorPosX() + imgui.GetColumnWidth() - imgui.GetStyle().FramePadding.x - imgui.CalcTextSize("[999]"));
 		local cdTime = math.floor(clammy.cooldown - os.clock());
@@ -1222,9 +1225,11 @@ func.renderClammy = function(clammy)
 		end
 		if (Config.showPercentChanceToBreak[1] == true) then
 			imgui.Text("Percent chance to break: "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:  "));
-			imgui.SetWindowFontScale(enlargedFontSize); imgui.SetCursorPosY(imgui.GetCursorPosY() - (2 * Config.windowScaling[1]));
+			imgui.PushFont(defaultFont, enlargedFontSize); imgui.SetCursorPosY(imgui.GetCursorPosY() - (2 * Config.windowScaling[1]));
 			imgui.TextColored(bucketBreakChance.color, formatChanceBreak(bucketBreakChance.percentWeight)); imgui.SameLine();
-			imgui.SetWindowFontScale(normalFontSize); imgui.SetCursorPosY(imgui.GetCursorPosY() + (2 * Config.windowScaling[1]));
+			imgui.PopFont();
+			imgui.PushFont(defaultFont, normalFontSize); imgui.SetCursorPosY(imgui.GetCursorPosY() + (2 * Config.windowScaling[1]));
+			-- imgui.SetWindowFontScale(normalFontSize); imgui.SetCursorPosY(imgui.GetCursorPosY() + (2 * Config.windowScaling[1]));
 			if (string.len(bucketBreakChance.percentWeight) == 1) then
 				imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:   " .. bucketBreakChance.percentWeight));
 			elseif (string.len(bucketBreakChance.percentWeight) == 3) then
@@ -1347,6 +1352,7 @@ func.renderClammy = function(clammy)
 				end
 			end
 		end
+		imgui.PopFont();
     end
     imgui.End();
 	return clammy;
