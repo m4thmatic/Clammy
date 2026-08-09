@@ -1225,6 +1225,7 @@ func.renderClammy = function(clammy)
 		end
 		if (Config.showPercentChanceToBreak[1] == true) then
 			imgui.Text("Percent chance to break: "); imgui.SameLine(); imgui.SetCursorPosX(imgui.CalcTextSize("Percent chance to break:  "));
+			imgui.PopFont();
 			imgui.PushFont(defaultFont, enlargedFontSize); imgui.SetCursorPosY(imgui.GetCursorPosY() - (2 * Config.windowScaling[1]));
 			imgui.TextColored(bucketBreakChance.color, formatChanceBreak(bucketBreakChance.percentWeight)); imgui.SameLine();
 			imgui.PopFont();
